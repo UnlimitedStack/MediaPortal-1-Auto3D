@@ -22,6 +22,7 @@ using System;
 using System.Collections;
 using System.Diagnostics;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Runtime.Remoting;
@@ -300,32 +301,125 @@ namespace TvControl
       }
     }
 
+    private static bool CheckTcpPortMethod2() // Not used for now
+    {
+      IPAddress ipa = (IPAddress)Dns.GetHostAddresses(_hostName)[0];
+
+      try
+      {
+        Socket sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        sock.Connect(ipa, REMOTING_PORT);
+        if (sock.Connected) // Port is in use and connection is successful
+        {
+          Log.Debug("RemoteControl: Port is Closed");
+          _isRemotingConnected = true;
+        }
+        sock.Close();
+
+      }
+      catch (SocketException ex)
+      {
+        Log.Debug("RemoteControl: {0}", (ex.Message));
+        _isRemotingConnected = false;
+      }
+      return _isRemotingConnected;
+    }
+
     private static bool CheckTcpPort()
     {
       Stopwatch benchClock = Stopwatch.StartNew();
-      using (TcpClient tcpClient = new TcpClient())
+      if (string.IsNullOrEmpty(_hostName))
+        return false;
+
+      _isRemotingConnected = false;
+      Socket sock = null;
+
+      try
       {
-        IAsyncResult result = tcpClient.BeginConnect(_hostName, REMOTING_PORT, ConnectCallback, tcpClient);
+        sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        IPAddress ip = (IPAddress)Dns.GetHostAddresses(_hostName)[0];
+        if (sock != null)
+        {
+          IPEndPoint ipEndPoint = new IPEndPoint(ip, REMOTING_PORT);
+
+          _isRemotingConnected = false;
+          //time out MAX_TCP_TIMEOUT
+          CallWithTimeout(ConnectToProxyServers, MAX_TCP_TIMEOUT, sock, ipEndPoint);
+
+          if (sock != null && sock.Connected)
+          {
+            _isRemotingConnected = true;
+          }
+        }
+      }
+      catch (Exception ex)
+      {
+        _isRemotingConnected = false;
+      }
+      finally
+      {
+        benchClock.Stop();
+        if (sock.Connected)
+        {
+          Log.Debug("RemoteControl: TCP connect took : {0}", benchClock.ElapsedMilliseconds);
+        }
         try
         {
-          if (!result.AsyncWaitHandle.WaitOne(MAX_TCP_TIMEOUT, true))
+          if (sock != null)
           {
-            tcpClient.Close();
-            return _isRemotingConnected = false;
+            sock.Shutdown(SocketShutdown.Both);
           }
-
-          tcpClient.EndConnect(result);
         }
         catch (Exception ex)
         {
-          return _isRemotingConnected = false;
         }
         finally
         {
-          benchClock.Stop();
-          Log.Debug("TCP connect took : {0}", benchClock.ElapsedMilliseconds);
+          if (sock != null)
+            sock.Close();
         }
-        return _isRemotingConnected = true;
+      }
+      return _isRemotingConnected;
+    }
+
+    private static void CallWithTimeout(Action<Socket, IPEndPoint> action, int timeoutMilliseconds, Socket socket,
+                                 IPEndPoint ipendPoint)
+    {
+      try
+      {
+        Action wrappedAction = () =>
+                                 {
+                                   action(socket, ipendPoint);
+                                 };
+
+        IAsyncResult result = wrappedAction.BeginInvoke(null, null);
+
+        if (result.AsyncWaitHandle.WaitOne(timeoutMilliseconds))
+        {
+          wrappedAction.EndInvoke(result);
+        }
+
+      }
+      catch (Exception ex)
+      {
+
+      }
+    }
+
+
+    private static void ConnectToProxyServers(Socket testSocket, IPEndPoint ipEndPoint)
+    {
+      try
+      {
+        if (testSocket == null || ipEndPoint == null)
+          return;
+
+        testSocket.Connect(ipEndPoint);
+
+      }
+      catch (Exception ex)
+      {
+
       }
     }
 
