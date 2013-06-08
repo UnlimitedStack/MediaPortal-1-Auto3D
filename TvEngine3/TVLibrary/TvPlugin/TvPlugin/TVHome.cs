@@ -99,7 +99,7 @@ namespace TvPlugin
     private Channel _resumeChannel = null;
     private Thread heartBeatTransmitterThread = null;
     private static DateTime _updateProgressTimer = DateTime.MinValue;
-    private static ChannelNavigator m_navigator;
+    public static ChannelNavigator m_navigator;
     private static TVUtil _util;
     private static VirtualCard _card = null;
     private static DateTime _updateTimer = DateTime.Now;
@@ -119,7 +119,7 @@ namespace TvPlugin
     private static bool _showlastactivemodule = false;
     private static bool _showlastactivemoduleFullscreen = false;
     private static bool _playbackStopped = false;
-    private static bool _onPageLoadDone = false;
+    public static bool _onPageLoadDone = false;
     private static bool _userChannelChanged = false;
     private static bool _showChannelStateIcons = true;
     private static bool _doingHandleServerNotConnected = false;

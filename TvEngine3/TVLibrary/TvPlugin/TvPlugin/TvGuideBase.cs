@@ -748,6 +748,16 @@ namespace TvPlugin
                 return false;
               }
 
+              if (!TVHome._onPageLoadDone && TVHome.m_navigator != null)
+              {
+                TVHome.m_navigator.ReLoad();
+              }
+
+              if (TVHome.m_navigator == null)
+              {
+                TVHome.m_navigator = new ChannelNavigator(); // Create the channel navigator (it will load groups and channels)
+              }
+
               GUIPropertyManager.SetProperty("#itemcount", string.Empty);
               GUIPropertyManager.SetProperty("#selecteditem", string.Empty);
               GUIPropertyManager.SetProperty("#selecteditem2", string.Empty);
