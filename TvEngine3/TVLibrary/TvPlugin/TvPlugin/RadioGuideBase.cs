@@ -668,7 +668,21 @@ namespace TvPlugin
                 GUIWindowManager.ActivateWindow((int)Window.WINDOW_SETTINGS_TVENGINE);
                 return false;
               }
-      
+
+              if (!TVHome._onPageLoadDone && TVHome.m_navigator != null)
+              {
+                TVHome.m_navigator.ReLoad();
+              }
+
+              if (TVHome.m_navigator == null)
+              {
+                TVHome.m_navigator = new ChannelNavigator(); // Create the channel navigator (it will load groups and channels)
+              }
+
+              // Reload ChannelGroups
+              Radio radioLoad = (Radio)GUIWindowManager.GetWindow((int)Window.WINDOW_RADIO);
+              radioLoad.OnAdded();
+
               GUIPropertyManager.SetProperty("#itemcount", string.Empty);
               GUIPropertyManager.SetProperty("#selecteditem", string.Empty);
               GUIPropertyManager.SetProperty("#selecteditem2", string.Empty);
