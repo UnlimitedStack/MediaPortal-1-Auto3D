@@ -336,7 +336,7 @@ namespace TvPlugin
         m_navigator = new ChannelNavigator();
         m_navigator.OnZapChannel -= new ChannelNavigator.OnZapChannelDelegate(ForceUpdates);
         m_navigator.OnZapChannel += new ChannelNavigator.OnZapChannelDelegate(ForceUpdates);
-        LoadSettings();
+        LoadSettings(false);
 
         string pluginVersion = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).ProductVersion;
         string tvServerVersion = Connected ? RemoteControl.Instance.GetAssemblyVersion : "Unknown";
@@ -488,6 +488,7 @@ namespace TvPlugin
       if (!_onPageLoadDone && m_navigator != null)
       {
         m_navigator.ReLoad();
+        LoadSettings(true);
       }
 
       if (m_navigator == null)
@@ -840,7 +841,7 @@ namespace TvPlugin
     {
       if (!settingsLoaded)
       {
-        LoadSettings();
+        LoadSettings(true);
       }
       return _usertsp;
     }
@@ -1119,9 +1120,9 @@ namespace TvPlugin
 
     #region Serialisation
 
-    private static void LoadSettings()
+    public static void LoadSettings(bool force)
     {
-      if (settingsLoaded)
+      if (settingsLoaded && !force)
       {
         return;
       }

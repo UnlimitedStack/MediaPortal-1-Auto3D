@@ -204,7 +204,10 @@ namespace TvPlugin
     {
       using (Settings xmlwriter = new MPSettings())
       {
-        xmlwriter.SetValue("radioguide", "channel", _currentChannel);
+        if (_currentChannel != null)
+        {
+          xmlwriter.SetValue("radioguide", "channel", _currentChannel);
+        }
         xmlwriter.SetValue("radioguide", "ypos", _cursorX.ToString());
         xmlwriter.SetValue("radioguide", "yoffset", ChannelOffset.ToString());
         xmlwriter.SetValue("radioguide", "timeperblock", _timePerBlock);
@@ -648,7 +651,10 @@ namespace TvPlugin
             {
               base.OnMessage(message);
               SaveSettings();
-              _recordingList.Clear();
+              if (_recordingList != null)
+              {
+                _recordingList.Clear();
+              }
 
               _controls = new Dictionary<int, GUIButton3PartControl>();
               _channelList = null;
@@ -669,9 +675,10 @@ namespace TvPlugin
                 return false;
               }
 
-              if (!TVHome._onPageLoadDone && TVHome.m_navigator != null)
+              if (TVHome.Navigator.Channel == null)
               {
                 TVHome.m_navigator.ReLoad();
+                TVHome.LoadSettings(true);
               }
 
               if (TVHome.m_navigator == null)

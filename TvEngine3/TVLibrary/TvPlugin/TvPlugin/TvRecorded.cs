@@ -288,6 +288,18 @@ namespace TvPlugin
       InitViewSelections();
       DeleteInvalidRecordings();
 
+      if (TVHome.Navigator.Channel == null)
+      {
+        TVHome.m_navigator.ReLoad();
+        TVHome.LoadSettings(true);
+      }
+
+      // Create the channel navigator (it will load groups and channels)
+      if (TVHome.m_navigator == null)
+      {
+        TVHome.m_navigator = new ChannelNavigator();
+      }
+
       if (btnCompress != null)
       {
         btnCompress.Visible = false;

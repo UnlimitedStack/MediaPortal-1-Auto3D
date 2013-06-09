@@ -87,7 +87,7 @@ namespace TvPlugin
     private Channel _lastViewedChannel = null; // saves the last viewed Channel  // mPod    
     private Channel m_currentChannel = null;
     private IList channels = new ArrayList();
-    private bool reentrant = false;    
+    private bool reentrant = false;
 
     #endregion
 
@@ -130,6 +130,7 @@ namespace TvPlugin
       catch (Exception ex)
       {
         TVHome.Connected = false;
+        return false;
       }
 
       try
@@ -146,6 +147,7 @@ namespace TvPlugin
       catch (Exception ex)
       {
         Log.Error("Unable to create/modify gentle.config {0},{1}", ex.Message, ex.StackTrace);
+        return false;
       }
 
       Log.Info("ChannelNavigator::Reload()");

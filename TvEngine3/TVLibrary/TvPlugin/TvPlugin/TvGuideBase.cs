@@ -292,7 +292,10 @@ namespace TvPlugin
     {
       using (Settings xmlwriter = new MPSettings())
       {
-        xmlwriter.SetValue("mytv", "channel", _currentChannel.DisplayName);
+        if (_currentChannel != null)
+        {
+          xmlwriter.SetValue("mytv", "channel", _currentChannel.DisplayName);
+        }
         xmlwriter.SetValue("tvguide", "timeperblock", _timePerBlock);
       }
     }
@@ -748,14 +751,16 @@ namespace TvPlugin
                 return false;
               }
 
-              if (!TVHome._onPageLoadDone && TVHome.m_navigator != null)
+              if (TVHome.Navigator.Channel == null)
               {
                 TVHome.m_navigator.ReLoad();
+                TVHome.LoadSettings(true);
               }
 
+              // Create the channel navigator (it will load groups and channels)
               if (TVHome.m_navigator == null)
               {
-                TVHome.m_navigator = new ChannelNavigator(); // Create the channel navigator (it will load groups and channels)
+                TVHome.m_navigator = new ChannelNavigator();
               }
 
               GUIPropertyManager.SetProperty("#itemcount", string.Empty);
