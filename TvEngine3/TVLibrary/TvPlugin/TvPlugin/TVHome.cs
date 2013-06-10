@@ -129,6 +129,7 @@ namespace TvPlugin
     private static bool _connected = false;
     private static bool _isAnyCardRecording = false;
     protected static TvServer _server;
+    public static bool firstNotLoaded = false;
 
     private static ManualResetEvent _waitForBlackScreen = null;
     private static ManualResetEvent _waitForVideoReceived = null;
@@ -336,7 +337,7 @@ namespace TvPlugin
         m_navigator = new ChannelNavigator();
         m_navigator.OnZapChannel -= new ChannelNavigator.OnZapChannelDelegate(ForceUpdates);
         m_navigator.OnZapChannel += new ChannelNavigator.OnZapChannelDelegate(ForceUpdates);
-        LoadSettings(false);
+        LoadSettings(true);
 
         string pluginVersion = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).ProductVersion;
         string tvServerVersion = Connected ? RemoteControl.Instance.GetAssemblyVersion : "Unknown";
@@ -841,7 +842,7 @@ namespace TvPlugin
     {
       if (!settingsLoaded)
       {
-        LoadSettings(true);
+        LoadSettings(false);
       }
       return _usertsp;
     }
@@ -1362,6 +1363,12 @@ namespace TvPlugin
         initMsg = new GUIMessage(GUIMessage.MessageType.GUI_MSG_WINDOW_INIT, (int) Window.WINDOW_TV_OVERLAY, 0, 0, 0, 0,
                                  null);
         GUIWindowManager.SendThreadMessage(initMsg);
+      }
+      if (firstNotLoaded)
+      {
+        firstNotLoaded = false;
+        TVHome TVHomeConnect = (TVHome)GUIWindowManager.GetWindow((int)GUIWindow.Window.WINDOW_TV);
+        TVHomeConnect.OnAdded();
       }
     }
 

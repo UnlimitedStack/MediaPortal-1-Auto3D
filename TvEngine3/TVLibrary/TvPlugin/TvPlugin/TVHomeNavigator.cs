@@ -104,6 +104,7 @@ namespace TvPlugin
     {
       if (!TVHome.Connected)
       {
+        TVHome.firstNotLoaded = true;
         return;
       }
 
@@ -129,7 +130,6 @@ namespace TvPlugin
       }
       catch (Exception ex)
       {
-        TVHome.Connected = false;
         return false;
       }
 
