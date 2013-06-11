@@ -751,7 +751,12 @@ namespace TvPlugin
                 return false;
               }
 
-              if (TVHome.Navigator.Channel == null)
+              if (TVHome.Navigator == null)
+              {
+                TVHome TVHomeConnect = (TVHome)GUIWindowManager.GetWindow((int)GUIWindow.Window.WINDOW_TV);
+                TVHomeConnect.OnAdded();
+              }
+              else if (TVHome.Navigator.Channel == null)
               {
                 TVHome.m_navigator.ReLoad();
                 TVHome.LoadSettings(true);

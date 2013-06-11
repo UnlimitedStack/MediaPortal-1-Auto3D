@@ -69,6 +69,7 @@ namespace TvPlugin
     private string rootGroup = "(none)";
     private static RadioChannelGroup selectedGroup;
     public static List<RadioChannelGroup> AllRadioGroups= new List<RadioChannelGroup>();
+    private static bool settingsRadioLoaded = false;
 
     #endregion
     
@@ -119,6 +120,11 @@ namespace TvPlugin
 
     protected override void LoadSettings()
     {
+      if (settingsRadioLoaded)
+      {
+        return;
+      }
+
       base.LoadSettings();
       using (Settings xmlreader = new MPSettings())
       {
@@ -160,6 +166,7 @@ namespace TvPlugin
 
         _autoTurnOnRadio = xmlreader.GetValueAsBool("myradio", "autoturnonradio", false);
       }
+      settingsRadioLoaded = true;
     }
 
     protected override void SaveSettings()
@@ -261,6 +268,27 @@ namespace TvPlugin
         GUIWindowManager.ActivateWindow((int)Window.WINDOW_SETTINGS_TVENGINE);
         return;
       }
+
+      if (TVHome.Navigator == null)
+      {
+        TVHome TVHomeConnect = (TVHome)GUIWindowManager.GetWindow((int)GUIWindow.Window.WINDOW_TV);
+        TVHomeConnect.OnAdded();
+      }
+      else if (TVHome.Navigator.Channel == null)
+      {
+        TVHome.m_navigator.ReLoad();
+        TVHome.LoadSettings(true);
+      }
+
+      // Create the channel navigator (it will load groups and channels)
+      if (TVHome.m_navigator == null)
+      {
+        TVHome.m_navigator = new ChannelNavigator();
+      }
+
+      // Reload ChannelGroups
+      Radio radioLoad = (Radio)GUIWindowManager.GetWindow((int)Window.WINDOW_RADIO);
+      radioLoad.OnAdded();
 
       base.OnPageLoad();
       GUIMessage msgStopRecorder = new GUIMessage(GUIMessage.MessageType.GUI_MSG_RECORDER_STOP, 0, 0, 0, 0, 0, null);

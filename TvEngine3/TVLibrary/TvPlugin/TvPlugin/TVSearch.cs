@@ -181,6 +181,22 @@ namespace TvPlugin
         return;
       }
 
+      if (TVHome.Navigator == null)
+      {
+        TVHome TVHomeConnect = (TVHome)GUIWindowManager.GetWindow((int)GUIWindow.Window.WINDOW_TV);
+        TVHomeConnect.OnAdded();
+      }
+      else if (TVHome.Navigator.Channel == null)
+      {
+        TVHome.m_navigator.ReLoad();
+        TVHome.LoadSettings(true);
+      }
+
+      if (TVHome.m_navigator == null)
+      {
+        TVHome.m_navigator = new ChannelNavigator(); // Create the channel navigator (it will load groups and channels)
+      }
+
       base.OnPageLoad();
       listRecordings = Schedule.ListAll();
 

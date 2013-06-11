@@ -129,7 +129,7 @@ namespace TvPlugin
     private static bool _connected = false;
     private static bool _isAnyCardRecording = false;
     protected static TvServer _server;
-    public static bool firstNotLoaded = false;
+    public static bool firstNotLoaded = true;
 
     private static ManualResetEvent _waitForBlackScreen = null;
     private static ManualResetEvent _waitForVideoReceived = null;
@@ -334,23 +334,26 @@ namespace TvPlugin
         TVHome.OnChannelChanged -= new OnChannelChangedDelegate(ForceUpdates);
         TVHome.OnChannelChanged += new OnChannelChangedDelegate(ForceUpdates);
 
-        m_navigator = new ChannelNavigator();
-        m_navigator.OnZapChannel -= new ChannelNavigator.OnZapChannelDelegate(ForceUpdates);
-        m_navigator.OnZapChannel += new ChannelNavigator.OnZapChannelDelegate(ForceUpdates);
-        LoadSettings(true);
-
-        string pluginVersion = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).ProductVersion;
-        string tvServerVersion = Connected ? RemoteControl.Instance.GetAssemblyVersion : "Unknown";
-
-        if (Connected && pluginVersion != tvServerVersion)
+        if (Connected && !firstNotLoaded)
         {
-          string strLine = "TvPlugin and TvServer don't have the same version.\r\n";
-          strLine += "TvServer Version: " + tvServerVersion + "\r\n";
-          strLine += "TvPlugin Version: " + pluginVersion;
-          Log.Error(strLine);
+          m_navigator = new ChannelNavigator();
+          m_navigator.OnZapChannel -= new ChannelNavigator.OnZapChannelDelegate(ForceUpdates);
+          m_navigator.OnZapChannel += new ChannelNavigator.OnZapChannelDelegate(ForceUpdates);
+          LoadSettings(true);
+
+          string pluginVersion = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).ProductVersion;
+          string tvServerVersion = Connected ? RemoteControl.Instance.GetAssemblyVersion : "Unknown";
+
+          if (Connected && pluginVersion != tvServerVersion)
+          {
+            string strLine = "TvPlugin and TvServer don't have the same version.\r\n";
+            strLine += "TvServer Version: " + tvServerVersion + "\r\n";
+            strLine += "TvPlugin Version: " + pluginVersion;
+            Log.Error(strLine);
+          }
+          else
+            Log.Info("TVHome V" + pluginVersion + ":ctor");
         }
-        else
-          Log.Info("TVHome V" + pluginVersion + ":ctor");
       }
       catch (Exception ex)
       {

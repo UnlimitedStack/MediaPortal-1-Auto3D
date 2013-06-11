@@ -284,11 +284,12 @@ namespace TvPlugin
         return;
       }
 
-      base.OnPageLoad();
-      InitViewSelections();
-      DeleteInvalidRecordings();
-
-      if (TVHome.Navigator.Channel == null)
+      if (TVHome.Navigator == null)
+      {
+        TVHome TVHomeConnect = (TVHome)GUIWindowManager.GetWindow((int)GUIWindow.Window.WINDOW_TV);
+        TVHomeConnect.OnAdded();
+      }
+      else if (TVHome.Navigator.Channel == null)
       {
         TVHome.m_navigator.ReLoad();
         TVHome.LoadSettings(true);
@@ -299,6 +300,10 @@ namespace TvPlugin
       {
         TVHome.m_navigator = new ChannelNavigator();
       }
+
+      base.OnPageLoad();
+      InitViewSelections();
+      DeleteInvalidRecordings();
 
       if (btnCompress != null)
       {
