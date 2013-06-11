@@ -319,7 +319,11 @@ namespace TvPlugin
 
       if ((_autoTurnOnRadio) && !(g_Player.Playing && g_Player.IsRadio))
       {
-        Play(facadeLayout.SelectedListItem);
+        GUIListItem item = facadeLayout.SelectedListItem;
+        if (item != null && item.Label != ".." && !item.IsFolder)
+        {
+          Play(facadeLayout.SelectedListItem);
+        }
       }
 
       btnSortBy.SortChanged += SortChanged;       
