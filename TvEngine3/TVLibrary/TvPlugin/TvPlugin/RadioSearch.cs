@@ -163,8 +163,11 @@ namespace TvPlugin
     protected override void OnPageDestroy(int newWindowId)
     {
       base.OnPageDestroy(newWindowId);
-      listRecordings.Clear();
-      listRecordings = null;
+      if (TVHome.Connected)
+      {
+        listRecordings.Clear();
+        listRecordings = null;
+      }
       if (!GUIGraphicsContext.IsTvWindow(newWindowId)) {}
     }
 

@@ -204,13 +204,16 @@ namespace TvPlugin
 
       if (!GUIGraphicsContext.IsTvWindow(newWindowId))
       {
-        if (TVHome.Card.IsTimeShifting && !(TVHome.Card.IsTimeShifting || TVHome.Card.IsRecording))
+        if (TVHome.Connected)
         {
-          if (GUIGraphicsContext.ShowBackground)
+          if (TVHome.Card.IsTimeShifting && !(TVHome.Card.IsTimeShifting || TVHome.Card.IsRecording))
           {
-            // stop timeshifting & viewing...
+            if (GUIGraphicsContext.ShowBackground)
+            {
+              // stop timeshifting & viewing...
 
-            TVHome.Card.StopTimeShifting();
+              TVHome.Card.StopTimeShifting();
+            }
           }
         }
       }
