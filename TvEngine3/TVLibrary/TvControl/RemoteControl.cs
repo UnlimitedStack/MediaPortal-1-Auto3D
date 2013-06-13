@@ -326,6 +326,22 @@ namespace TvControl
       return _isRemotingConnected;
     }
 
+    public static IPAddress GetIP4Addresses()
+    {
+      IPAddress ipv4Address = null;
+
+      foreach (IPAddress currentIPAddress in Dns.GetHostAddresses(_hostName))
+      {
+        if (currentIPAddress.AddressFamily == AddressFamily.InterNetwork)
+        {
+          ipv4Address = currentIPAddress;
+          break;
+        }
+      }
+
+      return ipv4Address;
+    }
+
     private static bool CheckTcpPort()
     {
       Stopwatch benchClock = Stopwatch.StartNew();
@@ -338,7 +354,7 @@ namespace TvControl
       try
       {
         sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        IPAddress ip = (IPAddress)Dns.GetHostAddresses(_hostName)[0];
+        IPAddress ip = (IPAddress) GetIP4Addresses();
         if (sock != null)
         {
           IPEndPoint ipEndPoint = new IPEndPoint(ip, REMOTING_PORT);
@@ -406,7 +422,6 @@ namespace TvControl
 
       }
     }
-
 
     private static void ConnectToProxyServers(Socket testSocket, IPEndPoint ipEndPoint)
     {
