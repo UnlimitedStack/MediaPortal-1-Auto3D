@@ -43,6 +43,7 @@ using MediaPortal.Player;
 using Action = MediaPortal.GUI.Library.Action;
 using Layout = MediaPortal.GUI.Library.GUIFacadeControl.Layout;
 using WindowPlugins;
+using ThreadPool = System.Threading.ThreadPool;
 
 namespace MediaPortal.GUI.Pictures
 {
@@ -71,7 +72,7 @@ namespace MediaPortal.GUI.Pictures
         //_hideFileExtensions = HideExtensions;
 
         work = new Work(new DoWorkHandler(this.PerformRequest));
-        work.ThreadPriority = ThreadPriority.BelowNormal;
+        work.ThreadPriority = ThreadPriority.Lowest;
         GlobalServiceProvider.Get<IThreadPool>().Add(work, QueuePriority.Low);
       }
 
@@ -92,6 +93,8 @@ namespace MediaPortal.GUI.Pictures
         if (!vDir.IsRemote(path))
         {
           itemlist = vDir.GetDirectoryUnProtectedExt(path, true);
+
+          itemlist.Sort(new PictureSort(PictureSort.SortMethod.Name, true));
 
           foreach (GUIListItem item in itemlist)
           {
@@ -238,37 +241,19 @@ namespace MediaPortal.GUI.Pictures
       }
     }
 
-    public class MissingThumbCacherFile
-    {
-      private VirtualDirectory vDir = new VirtualDirectory();
-
-      private string _filepath = string.Empty;
-      private bool _createLarge = true;
-      private bool _recreateWithoutCheck = false;
-      private Work workfile;
-
-      public MissingThumbCacherFile(string item, bool CreateLargeThumbs, bool ReCreateThumbs)
-      {
-        _filepath = item;
-        _createLarge = CreateLargeThumbs;
-        _recreateWithoutCheck = ReCreateThumbs;
-        //_hideFileExtensions = HideExtensions;
-
-        workfile = new Work(new DoWorkHandler(this.PerformRequestfile));
-        workfile.ThreadPriority = ThreadPriority.BelowNormal;
-        GlobalServiceProvider.Get<IThreadPool>().Add(workfile, QueuePriority.Low);
-      }
-
       /// <summary>
       /// creates cached thumbs in MP's thumbs dir
       /// </summary>
-      private void PerformRequestfile()
+    private void GetThumbnailfile(object i)
       {
+      Thread.CurrentThread.Name = "GUIPictures Thumbnail";
         Stopwatch benchclockfile = new Stopwatch();
+      VirtualDirectory vDir = new VirtualDirectory();
+      GUIListItem itemObject = (GUIListItem) i;
         benchclockfile.Start();
-        string item = _filepath;
-        bool autocreateLargeThumbs = _createLarge;
-        bool recreateThumbs = _recreateWithoutCheck;
+      string item = itemObject.Path;
+      bool autocreateLargeThumbs = _autocreateLargeThumbs;
+      bool recreateThumbs = false;
 
         vDir.SetExtensions(Util.Utils.PictureExtensions);
 
@@ -282,10 +267,8 @@ namespace MediaPortal.GUI.Pictures
           {
             return;
           }
-          //Thread.Sleep(100);
 
           int iRotate = PictureDatabase.GetRotation(item);
-          //Thread.Sleep(30);
 
           bool isVideo = Util.Utils.IsVideo(item);
           bool isPicture = Util.Utils.IsPicture(item);
@@ -309,7 +292,6 @@ namespace MediaPortal.GUI.Pictures
             if (recreateThumbs || !File.Exists(thumbnailImage) || !Util.Utils.FileExistsInCache(thumbnailImage) ||
                 !File.Exists(thumbnailImageL) || !Util.Utils.FileExistsInCache(thumbnailImageL))
             {
-              //Thread.Sleep(10);
 
               if (isPicture)
               {
@@ -319,15 +301,15 @@ namespace MediaPortal.GUI.Pictures
 
                 if (autocreateLargeThumbs && !File.Exists(thumbnailImageL))
                 {
-                  thumbRet = Util.Picture.CreateThumbnail(item, thumbnailImageL, (int)Thumbs.ThumbLargeResolution,
-                                                          (int)Thumbs.ThumbLargeResolution, iRotate,
+                thumbRet = Util.Picture.CreateThumbnail(item, thumbnailImageL, (int) Thumbs.ThumbLargeResolution,
+                                                        (int) Thumbs.ThumbLargeResolution, iRotate,
                                                           Thumbs.SpeedThumbsLarge,
                                                           true, false);
                 }
                 if (!File.Exists(thumbnailImage))
                 {
-                  thumbRet = Util.Picture.CreateThumbnail(item, thumbnailImage, (int)Thumbs.ThumbResolution,
-                                                          (int)Thumbs.ThumbResolution, iRotate,
+                thumbRet = Util.Picture.CreateThumbnail(item, thumbnailImage, (int) Thumbs.ThumbResolution,
+                                                        (int) Thumbs.ThumbResolution, iRotate,
                                                           Thumbs.SpeedThumbsSmall,
                                                           false, false);
                 }
@@ -343,7 +325,6 @@ namespace MediaPortal.GUI.Pictures
               }
               else if (thumbRet)
               {
-                //Thread.Sleep(30);
                 Log.Debug("GUIPictures: Creation of missing thumb successful for {0}", item);
               }
             }
@@ -351,12 +332,11 @@ namespace MediaPortal.GUI.Pictures
           if (thumbRet)
           {
             benchclockfile.Stop();
-            Log.Debug("GUIPictures: Creation of selected thumb process file for '{0}' took {1} seconds", _filepath,
+          Log.Debug("GUIPictures: Creation of selected thumb process file for '{0}' took {1} seconds", item,
                       benchclockfile.Elapsed.TotalSeconds);
           }
         }
       }
-    }
 
     #endregion
 
@@ -612,6 +592,36 @@ namespace MediaPortal.GUI.Pictures
       base.OnAction(action);
     }
 
+    public override void Process()
+    {
+      GUISlideShow SlideShow = (GUISlideShow)GUIWindowManager.GetWindow((int)Window.WINDOW_SLIDESHOW);
+      if (SlideShow._enableResumeMusic)
+      {
+        // Enable only once to deinit stopped Fullscreen Video 
+        base.Process();
+        SlideShow._enableResumeMusic = false;
+      }
+      else if (((GUIWindow.Window)(Enum.Parse(typeof(GUIWindow.Window), GUIWindowManager.ActiveWindow.ToString())) == GUIWindow.Window.WINDOW_PICTURES) && !g_Player.Playing )
+      {
+        if (SlideShow.pausedMusic && SlideShow._returnedFromVideoPlayback && !SlideShow._isBackgroundMusicPlaying)
+        {
+          SlideShow.resumePausedMusic();
+        }
+        if (SlideShow._returnedFromVideoPlayback)
+        {
+          SlideShow._returnedFromVideoPlayback = false;
+        }
+        if (SlideShow.pausedMusic)
+        {
+          SlideShow.pausedMusic = false;
+        }
+        if (SlideShow._isBackgroundMusicPlaying)
+        {
+          SlideShow._isBackgroundMusicPlaying = false;
+        }
+      }
+    }
+
     protected override void OnPageLoad()
     {
       base.OnPageLoad();
@@ -648,7 +658,6 @@ namespace MediaPortal.GUI.Pictures
         {
           if (direction == 0)
           {
-            SlideShow._returnedFromVideoPlayback = false;
             SlideShow.Reset();
           }
         }
@@ -682,14 +691,41 @@ namespace MediaPortal.GUI.Pictures
           }
           OnClickSlide(selectedItemIndex);
         }
-        if (SlideShow.pausedMusic)
-        {
-          SlideShow.resumePausedMusic();
-        }
 
         if (SlideShow._showRecursive)
         {
           SlideShow._showRecursive = false;
+        }
+
+        // Select latest item played from slideshow/slideshow recursive (random or not)
+        if (disp == Display.Files)
+        {
+          string strSelectedItemExt = Util.Utils.GetFileNameWithExtension(SlideShow._folderCurrentItem);
+          string strSelectedItem = Util.Utils.GetFilename(SlideShow._folderCurrentItem, true);
+          SlideShow._folderCurrentItem = Path.GetDirectoryName(SlideShow._folderCurrentItem);
+          if (selectedItemIndex >= 0 && !String.IsNullOrEmpty(SlideShow._folderCurrentItem))
+          {
+            LoadFolderSettings(SlideShow._folderCurrentItem);
+            LoadDirectory(SlideShow._folderCurrentItem);
+            int totalItemCount = facadeLayout.Count;
+            for (int i = 0; i < totalItemCount; i++)
+            {
+              if (facadeLayout[i].Label == strSelectedItemExt || facadeLayout[i].Label == strSelectedItem)
+              {
+                GUIControl.SelectItemControl(GetID, facadeLayout.GetID, i);
+                SlideShow._folderCurrentItem = null;
+                break;
+      }
+            }
+          }
+          else
+          {
+            GUIControl.SelectItemControl(GetID, facadeLayout.GetID, selectedItemIndex);
+          }
+        }
+        else
+        {
+          GUIControl.SelectItemControl(GetID, facadeLayout.GetID, 0);
         }
       }
       btnSortBy.SortChanged += new SortEventHandler(SortChanged);
@@ -1332,7 +1368,8 @@ namespace MediaPortal.GUI.Pictures
         string thumbnailImage = GetThumbnail(item.Path);
         if ((!File.Exists(thumbnailImage) || !Util.Utils.FileExistsInCache(thumbnailImage)) && Util.Utils.IsPicture(item.Path))
         {
-          MissingThumbCacherFile ManualThumbBuilder = new MissingThumbCacherFile(item.Path, _autocreateLargeThumbs, false);
+          // creating and starting a thread for potentially every file in a list is very expensive, we should use the threadpool
+          ThreadPool.QueueUserWorkItem(GetThumbnailfile, item);
         }
         item.IconImage = thumbnailImage;
         if (_autocreateLargeThumbs)
@@ -1440,6 +1477,9 @@ namespace MediaPortal.GUI.Pictures
         return;
       }
       GUIDialogExif exifDialog = (GUIDialogExif)GUIWindowManager.GetWindow((int)Window.WINDOW_DIALOG_EXIF);
+      // Needed to set GUIDialogExif
+      exifDialog.Restore();
+      exifDialog = (GUIDialogExif)GUIWindowManager.GetWindow((int)Window.WINDOW_DIALOG_EXIF);
       exifDialog.FileName = item.Path;
       exifDialog.DoModal(GetID);
       // Fix for Mantis issue: 0001709: Background not correct after viewing pictures properties twice
@@ -1708,13 +1748,27 @@ namespace MediaPortal.GUI.Pictures
           if (item.Label != ".." && !SlideShow._slideFolder.Contains(item.Label))
           {
             SlideShow._slideFolder.Add(item.Path);
+            if (_playVideosInSlideshows)
+            {
             SlideShow.Add(item.Path);
+          }
+            else if (!Util.Utils.IsVideo(item.Path))
+            {
+              SlideShow.Add(item.Path);
+        }
           }
         }
         else if (!item.IsRemote)
         {
+          if (_playVideosInSlideshows)
+          {
           SlideShow.Add(item.Path);
         }
+          else if (!Util.Utils.IsVideo(item.Path))
+          {
+            SlideShow.Add(item.Path);
+      }
+    }
       }
     }
 
@@ -1795,7 +1849,14 @@ namespace MediaPortal.GUI.Pictures
           {
             continue;
           }
+          if (_playVideosInSlideshows)
+          {
           SlideShow.Add(item.Path);
+        }
+          else if (!Util.Utils.IsVideo(item.Path))
+          {
+            SlideShow.Add(item.Path);
+      }
         }
       }
       if (SlideShow.Count > 0)
@@ -2009,17 +2070,8 @@ namespace MediaPortal.GUI.Pictures
           item.OnItemSelected += new GUIListItem.ItemSelectedHandler(item_OnItemSelected);
           facadeLayout.Add(item);
 
-          if (!item.IsFolder && item.Path != "..")
-          {
-            string thumbnailImage = GetThumbnail(item.Path);
-            if ((!File.Exists(thumbnailImage) || !Util.Utils.FileExistsInCache(thumbnailImage)) && Util.Utils.IsPicture(item.Path))
-            {
-              MissingThumbCacherFile ManualThumbBuilder = new MissingThumbCacherFile(item.Path, _autocreateLargeThumbs, false);
-            }
-          }
           if (item.IsFolder)
           {
-            //MissingThumbCacher ThumbWorker = new MissingThumbCacher(item.Path, _autocreateLargeThumbs, false);
             CountOfNonImageItems++; // necessary to select the right item later from the slideshow
           }
         }
