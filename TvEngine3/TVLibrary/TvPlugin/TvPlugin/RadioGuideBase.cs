@@ -651,7 +651,7 @@ namespace TvPlugin
             {
               base.OnMessage(message);
               SaveSettings();
-              if (_recordingList != null)
+              if (_recordingList != null && TVHome.Connected)
               {
                 _recordingList.Clear();
               }
@@ -666,7 +666,6 @@ namespace TvPlugin
 
           case GUIMessage.MessageType.GUI_MSG_WINDOW_INIT:
             {              
-              TVHome.WaitForGentleConnection();
 
               if (!TVHome.Connected)
               {
@@ -674,6 +673,8 @@ namespace TvPlugin
                 GUIWindowManager.ActivateWindow((int)Window.WINDOW_SETTINGS_TVENGINE);
                 return false;
               }
+
+              TVHome.WaitForGentleConnection();
 
               if (TVHome.Navigator == null)
               {

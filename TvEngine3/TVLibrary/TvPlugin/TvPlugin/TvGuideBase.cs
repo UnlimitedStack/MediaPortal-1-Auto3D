@@ -730,7 +730,10 @@ namespace TvPlugin
             {
               base.OnMessage(message);
               SaveSettings();
-              _recordingList.Clear();
+              if (_recordingList != null && TVHome.Connected)
+              {
+                _recordingList.Clear();
+              }
 
               _controls = new Dictionary<int, GUIButton3PartControl>();
               _channelList = null;
@@ -742,7 +745,6 @@ namespace TvPlugin
 
           case GUIMessage.MessageType.GUI_MSG_WINDOW_INIT:
             {
-              TVHome.WaitForGentleConnection();
 
               if (!TVHome.Connected)
               {
@@ -750,6 +752,8 @@ namespace TvPlugin
                 GUIWindowManager.ActivateWindow((int)Window.WINDOW_SETTINGS_TVENGINE);
                 return false;
               }
+
+              TVHome.WaitForGentleConnection();
 
               if (TVHome.Navigator == null)
               {
