@@ -360,7 +360,10 @@ namespace TvPlugin
         Log.Error("TVHome: Error occured in Init(): {0}, st {1}", ex.Message, Environment.StackTrace);
       }
 
-      _notifyManager.Start();
+      if (!firstNotLoaded)
+      {
+        _notifyManager.Start();
+      }
     }
 
 
