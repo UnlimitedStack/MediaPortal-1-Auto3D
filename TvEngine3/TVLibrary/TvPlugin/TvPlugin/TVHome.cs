@@ -898,19 +898,25 @@ namespace TvPlugin
       }
 
       _ServerNotConnectedHandled = true;
-      GUIDialogOK pDlgOK = (GUIDialogOK)GUIWindowManager.GetWindow((int)Window.WINDOW_DIALOG_OK);
+      GUIDialogNotify pDlgOK = (GUIDialogNotify)GUIWindowManager.GetWindow((int)Window.WINDOW_DIALOG_NOTIFY);
+
+      if (pDlgOK == null)
+      {
+        return;
+      }
 
       pDlgOK.Reset();
       pDlgOK.SetHeading(257); //error
       if (Navigator != null && Navigator.CurrentChannel != null && g_Player.IsTV)
       {
-        pDlgOK.SetLine(1, Navigator.CurrentChannel);
+        pDlgOK.SetText(Navigator.CurrentChannel);
       }
       else
       {
-        pDlgOK.SetLine(1, "");
+        pDlgOK.SetText("");
       }
-      pDlgOK.SetLine(2, GUILocalizeStrings.Get(1510)); //Connection to TV server lost
+      pDlgOK.SetText(GUILocalizeStrings.Get(1510)); //Connection to TV server lost
+      pDlgOK.TimeOut = 5;
       pDlgOK.DoModal(GUIWindowManager.ActiveWindow);
     }
 
