@@ -107,7 +107,7 @@ namespace TvPlugin
     private static int _waitonresume = 0;
     public static bool settingsLoaded = false;
     private TvCropManager _cropManager = new TvCropManager();
-    private TvNotifyManager _notifyManager = new TvNotifyManager();
+    private static TvNotifyManager _notifyManager = new TvNotifyManager();
     private static List<string> _preferredLanguages;
     private static bool _usertsp;
     private static string _recordingpath = "";
@@ -275,6 +275,44 @@ namespace TvPlugin
       return Load(GUIGraphicsContext.Skin + @"\mytvhomeServer.xml");
     }
 
+    public static void OnLoaded()
+    {
+      Log.Info("TVHome:OnLoaded");
+
+      try
+      {
+        if (Connected && !firstNotLoaded)
+        {
+          m_navigator = new ChannelNavigator();
+          m_navigator.OnZapChannel -= new ChannelNavigator.OnZapChannelDelegate(ForceUpdates);
+          m_navigator.OnZapChannel += new ChannelNavigator.OnZapChannelDelegate(ForceUpdates);
+          LoadSettings(true);
+
+          string pluginVersion = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).ProductVersion;
+          string tvServerVersion = Connected ? RemoteControl.Instance.GetAssemblyVersion : "Unknown";
+
+          if (Connected && pluginVersion != tvServerVersion)
+          {
+            string strLine = "TvPlugin and TvServer don't have the same version.\r\n";
+            strLine += "TvServer Version: " + tvServerVersion + "\r\n";
+            strLine += "TvPlugin Version: " + pluginVersion;
+            Log.Error(strLine);
+          }
+          else
+            Log.Info("TVHome V" + pluginVersion + ":ctor");
+        }
+      }
+      catch (Exception ex)
+      {
+        Log.Error("TVHome: Error occured in on loading : {0}, st {1}", ex.Message, Environment.StackTrace);
+      }
+
+      if (!firstNotLoaded)
+      {
+        _notifyManager.Start();
+      }
+    }
+
     public override void OnAdded()
     {
       Log.Info("TVHome:OnAdded");
@@ -333,37 +371,13 @@ namespace TvPlugin
 
         TVHome.OnChannelChanged -= new OnChannelChangedDelegate(ForceUpdates);
         TVHome.OnChannelChanged += new OnChannelChangedDelegate(ForceUpdates);
-
-        if (Connected && !firstNotLoaded)
-        {
-          m_navigator = new ChannelNavigator();
-          m_navigator.OnZapChannel -= new ChannelNavigator.OnZapChannelDelegate(ForceUpdates);
-          m_navigator.OnZapChannel += new ChannelNavigator.OnZapChannelDelegate(ForceUpdates);
-          LoadSettings(true);
-
-          string pluginVersion = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).ProductVersion;
-          string tvServerVersion = Connected ? RemoteControl.Instance.GetAssemblyVersion : "Unknown";
-
-          if (Connected && pluginVersion != tvServerVersion)
-          {
-            string strLine = "TvPlugin and TvServer don't have the same version.\r\n";
-            strLine += "TvServer Version: " + tvServerVersion + "\r\n";
-            strLine += "TvPlugin Version: " + pluginVersion;
-            Log.Error(strLine);
-          }
-          else
-            Log.Info("TVHome V" + pluginVersion + ":ctor");
-        }
       }
       catch (Exception ex)
       {
         Log.Error("TVHome: Error occured in Init(): {0}, st {1}", ex.Message, Environment.StackTrace);
       }
 
-      if (!firstNotLoaded)
-      {
-        _notifyManager.Start();
-      }
+      OnLoaded();
     }
 
 
@@ -467,11 +481,7 @@ namespace TvPlugin
       if (!Connected)
       {
         RemoteControl.Clear();
-        GUIWindowManager.ActivateWindow((int) Window.WINDOW_SETTINGS_TVENGINE);
-        return;
-      }
-      else if (_onPageLoadDone)
-      {
+        GUIWindowManager.ActivateWindow((int)Window.WINDOW_SETTINGS_TVENGINE);
         UpdateStateOfRecButton();
         UpdateProgressPercentageBar();
         UpdateRecordingIndicator();
@@ -495,7 +505,7 @@ namespace TvPlugin
       if (!_onPageLoadDone && m_navigator != null)
       {
         m_navigator.ReLoad();
-        LoadSettings(true);
+        LoadSettings(false);
       }
 
       if (m_navigator == null)
@@ -1379,8 +1389,7 @@ namespace TvPlugin
       if (firstNotLoaded)
       {
         firstNotLoaded = false;
-        TVHome TVHomeConnect = (TVHome)GUIWindowManager.GetWindow((int)GUIWindow.Window.WINDOW_TV);
-        TVHomeConnect.OnAdded();
+        OnLoaded();
       }
     }
 

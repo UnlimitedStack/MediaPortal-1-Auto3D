@@ -184,13 +184,12 @@ namespace TvPlugin
 
       if (TVHome.Navigator == null)
       {
-        TVHome TVHomeConnect = (TVHome)GUIWindowManager.GetWindow((int)GUIWindow.Window.WINDOW_TV);
-        TVHomeConnect.OnAdded();
+        TVHome.OnLoaded();
       }
       else if (TVHome.Navigator.Channel == null)
       {
         TVHome.m_navigator.ReLoad();
-        TVHome.LoadSettings(true);
+        TVHome.LoadSettings(false);
       }
 
       // Create the channel navigator (it will load groups and channels)
