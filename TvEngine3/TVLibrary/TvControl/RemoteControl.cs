@@ -193,7 +193,6 @@ namespace TvControl
         {
           if (!_firstFailure)
           {
-            Log.Debug("RemoteControl - Disconnected st : {0}", Environment.StackTrace);
             Log.Info("RemoteControl - Disconnected ");
             OnRemotingDisconnected();
           }
