@@ -28,6 +28,8 @@ using MediaPortal.Configuration;
 using MediaPortal.ServiceImplementations;
 using MediaPortal.Profile;
 using MediaPortal.Services;
+using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 namespace MediaPortal.Util
 {
@@ -37,8 +39,11 @@ namespace MediaPortal.Util
     private static string ExtractorPath = Config.GetFile(Config.Dir.Base, "MovieThumbnailer", ExtractApp);
     private static int PreviewColumns = 2;
     private static int PreviewRows = 2;
+    private static int TimeBetweenFrames = 5;
+    private static int preRecordInterval = 1;
     private static bool LeaveShareThumb = false;
     private static bool NeedsConfigRefresh = true;
+    private static MediaPortal.Player.MediaInfoWrapper MediaInfo = null;
 
     #region Serialisation
 
@@ -49,8 +54,9 @@ namespace MediaPortal.Util
         PreviewColumns = xmlreader.GetValueAsInt("thumbnails", "videothumbcols", 1);
         PreviewRows = xmlreader.GetValueAsInt("thumbnails", "videothumbrows", 1);
         LeaveShareThumb = xmlreader.GetValueAsBool("thumbnails", "videosharepreview", false);
-        Log.Debug("VideoThumbCreator: Settings loaded - using {0} columns and {1} rows. Share thumb = {2}",
-                  PreviewColumns, PreviewRows, LeaveShareThumb);
+        preRecordInterval = xmlreader.GetValueAsInt("thumbnails", "preRecordInterval", 1);
+        Log.Debug("VideoThumbCreator: Settings loaded - using {0} columns and {1} rows. Share thumb = {2}, preRecordInterval = {3}.",
+                  PreviewColumns, PreviewRows, LeaveShareThumb, preRecordInterval);
         NeedsConfigRefresh = false;
       }
     }
@@ -72,6 +78,8 @@ namespace MediaPortal.Util
     [MethodImpl(MethodImplOptions.Synchronized)]
     public static bool CreateVideoThumb(string aVideoPath, string aThumbPath, bool aCacheThumb, bool aOmitCredits)
     {
+      //Log.Debug("VideoThumbCreator: args {0}, {1}!", aVideoPath, aThumbPath);
+
       if (NeedsConfigRefresh)
       {
         LoadSettings();
@@ -128,24 +136,59 @@ namespace MediaPortal.Util
       const double flblank = 0.6;
       string blank = flblank.ToString("F", CultureInfo.CurrentCulture);
 
-      int preGapSec = 5;
-      int postGapSec = 5;
+      int preGapSec = preRecordInterval*60; 
+
+      int intRnd = 0;
       if (aOmitCredits)
       {
-        preGapSec = 420;
-        postGapSec = 600;
+        Random rnd = new Random();
+        intRnd = rnd.Next(10, 120);
       }
+      preGapSec = preGapSec+intRnd;
+      Log.Debug("VideoThumbCreator: random value: {0}", intRnd);
       bool Success = false;
       /*string ExtractorArgs = string.Format(" -D 6 -B {0} -E {1} -c {2} -r {3} -b {4} -t -i -w {5} -n -P \"{6}\"",
                                            preGapSec, postGapSec, PreviewColumns, PreviewRows, blank, 0, aVideoPath);
       string ExtractorFallbackArgs = string.Format(
         " -D 8 -B {0} -E {1} -c {2} -r {3} -b {4} -t -i -w {5} -n -P \"{6}\"", 0, 0, PreviewColumns, PreviewRows, blank,
         0, aVideoPath);*/
+
+
+      MediaInfo = new MediaPortal.Player.MediaInfoWrapper(aVideoPath);
+
+      int Duration = MediaInfo.VideoDuration / 1000;
+
+      if (Duration > 1800) // to prevent slow ffmpeg running
+      {
+        Duration = 1800;
+      }
       
+      if (preGapSec > Duration)
+      {
+        preGapSec = Duration - 5;
+      }
+
+      switch (PreviewColumns * PreviewRows)
+      {
+        case 1:
+        TimeBetweenFrames = 1;
+        break;
+        case 2:
+        TimeBetweenFrames = (Duration - preGapSec) / 3;
+        break;
+        case 4:
+        TimeBetweenFrames = (Duration - preGapSec) / 5;
+        break;
+      }
+
+      Log.Debug("{0} duration is {1}, TimeBetweenFrames is {2}", aVideoPath, Duration, TimeBetweenFrames);
+
       string strFilenamewithoutExtension = Path.ChangeExtension(aVideoPath, null);
-      string ffmpegArgs = string.Format("select=isnan(prev_selected_t)+gte(t-prev_selected_t" + "\\" + ",5),yadif=0:-1:0,scale=600:337,setsar=1:1,tile={0}x{1}", PreviewColumns, PreviewRows);
+      string ffmpegArgs = string.Format("select=isnan(prev_selected_t)+gte(t-prev_selected_t" + "\\" + ",{0}),yadif=0:-1:0,scale=600:337,setsar=1:1,tile={1}x{2}", TimeBetweenFrames, PreviewColumns, PreviewRows);
+      string ffmpegFallbackArgs = string.Format("select=isnan(prev_selected_t)+gte(t-prev_selected_t" + "\\" + ",{0}),yadif=0:-1:0,scale=600:337,setsar=1:1,tile={1}x{2}", 5, PreviewColumns, PreviewRows);
+
       string ExtractorArgs = string.Format("-loglevel quiet -ss {0} -i \"{1}\" -vf {2} -vframes 1 -vsync 0 -an \"{3}_s.jpg\"", preGapSec, aVideoPath, ffmpegArgs, strFilenamewithoutExtension);
-      string ExtractorFallbackArgs = string.Format("-loglevel quiet -ss {0} -i \"{1}\" -vf {2} -vframes 1 -vsync 0 -an \"{3}_s.jpg\"", 5, aVideoPath, ffmpegArgs, strFilenamewithoutExtension);
+      string ExtractorFallbackArgs = string.Format("-loglevel quiet -ss {0} -i \"{1}\" -vf {2} -vframes 1 -vsync 0 -an \"{3}_s.jpg\"", 5, aVideoPath, ffmpegFallbackArgs, strFilenamewithoutExtension);
       
       // Honour we are using a unix app
       //ExtractorArgs = ExtractorArgs.Replace('\\', '/');
@@ -157,23 +200,30 @@ namespace MediaPortal.Util
         string ShareThumb = OutputThumb.Replace("_s.jpg", ".jpg");
 
         if ((LeaveShareThumb && !Util.Utils.FileExistsInCache(ShareThumb))
-            // No thumb in share although it should be there
+            // No thumb in share although it should be there 
+            || (LeaveShareThumb && aOmitCredits)
+            // or a refress needs by user (from context menu)
             || (!LeaveShareThumb && !Util.Utils.FileExistsInCache(aThumbPath)))
           // No thumb cached and no chance to find it in share
         {
-          //Log.Debug("VideoThumbCreator: No thumb in share {0} - trying to create one with arguments: {1}", ShareThumb, ExtractorArgs);
-          Success = Utils.StartProcess(ExtractorPath, ExtractorArgs, TempPath, 15000, true, GetMtnConditions());
+          Log.Debug("VideoThumbCreator: No thumb in share {0} - trying to create one with arguments: {1}", ShareThumb, ExtractorArgs);
+          if (aOmitCredits)
+          {
+            File.Delete(ShareThumb);
+          }
+          Success = Utils.StartProcess(ExtractorPath, ExtractorArgs, TempPath, 120000, true, GetMtnConditions());
           if (!Success)
           {
             // Maybe the pre-gap was too large or not enough sharp & light scenes could be caught
-            Thread.Sleep(100);
-            Success = Utils.StartProcess(ExtractorPath, ExtractorFallbackArgs, TempPath, 30000, true, GetMtnConditions());
+            //Log.Debug("VideoThumbCreator: not success");
+            Thread.Sleep(1000);
+            Success = Utils.StartProcess(ExtractorPath, ExtractorFallbackArgs, TempPath, 120000, true, GetMtnConditions());
             if (!Success)
               Log.Info("VideoThumbCreator: {0} has not been executed successfully with arguments: {1}", ExtractApp,
                        ExtractorFallbackArgs);
           }
           // give the system a few IO cycles
-          Thread.Sleep(100);
+          Thread.Sleep(1000);
           // make sure there's no process hanging
           Utils.KillProcess(Path.ChangeExtension(ExtractApp, null));
           try

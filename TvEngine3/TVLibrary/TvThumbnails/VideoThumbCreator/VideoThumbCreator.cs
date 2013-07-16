@@ -36,6 +36,8 @@ namespace TvThumbnails.VideoThumbCreator
 
     private static readonly string _extractorPath = ExtractorPath();
 
+    private static MediaInfoWrapper.MediaInfoWrapper MediaInfo = null;
+
     public static string ExtractorPath()
     {
       string currentPath = Assembly.GetCallingAssembly().Location;
@@ -70,20 +72,53 @@ namespace TvThumbnails.VideoThumbCreator
           return false;
         }*/
 
-      int preGapSec = 5;
-      int postGapSec = 5;
+      int TimeIntBwThumbs = 0;
 
-      if (aOmitCredits)
+      int preGapSec = Thumbs.TimeOffset * 60;
+      
+      Log.Debug("VideoThumbCreator: preGapSec: {0}", preGapSec);
+
+      MediaInfo = new MediaInfoWrapper.MediaInfoWrapper(aVideoPath);
+
+      int Duration = MediaInfo.VideoDuration / 1000;
+
+      if (Duration > 1800) // to prevent slow ffmpeg running
       {
-        preGapSec = 420;
-        postGapSec = 600;
+        Duration = 1800;
       }
+
+      if (preGapSec > Duration)
+      {
+        preGapSec = Duration - 5;
+      }
+
+      switch (Thumbs.PreviewColumns * Thumbs.PreviewRows)
+      {
+        case 1:
+          TimeIntBwThumbs = 1;
+          break;
+        case 2:
+          TimeIntBwThumbs = (Duration - preGapSec) / 3;
+          break;
+        case 4:
+          TimeIntBwThumbs = (Duration - preGapSec) / 5;
+          break;
+      }
+
+      Log.Debug("{0} duration is {1}, TimeIntBwThumbs is {2}", aVideoPath, Duration, TimeIntBwThumbs);
 
       bool Success = false;
       string strFilenamewithoutExtension = Path.ChangeExtension(aVideoPath, null);
 
       string ffmpegArgs =
-        string.Format("select=isnan(prev_selected_t)+gte(t-prev_selected_t\\,5),") +
+        string.Format("select=isnan(prev_selected_t)+gte(t-prev_selected_t\\,{0}),", TimeIntBwThumbs) +
+        string.Format("yadif=0:-1:0,") +
+        string.Format("scale={0}:{1},", 600, 337) +
+        string.Format("setsar=1:1,") +
+        string.Format("tile={0}x{1}", Thumbs.PreviewColumns, Thumbs.PreviewRows);
+
+      string ffmpegFallbackArgs =
+        string.Format("select=isnan(prev_selected_t)+gte(t-prev_selected_t\\,{0}),", 5) +
         string.Format("yadif=0:-1:0,") +
         string.Format("scale={0}:{1},", 600, 337) +
         string.Format("setsar=1:1,") +
@@ -91,15 +126,15 @@ namespace TvThumbnails.VideoThumbCreator
 
       string ExtractorArgs =
         string.Format("-loglevel quiet -ss {0} ", preGapSec) +
-        string.Format("-i \"{0}\" ", aVideoPath) + 
-        string.Format("-vf {0} ", ffmpegArgs) + 
+        string.Format("-i \"{0}\" ", aVideoPath) +
+        string.Format("-vf {0} ", ffmpegArgs) +
         string.Format("-vframes 1 -vsync 0 ") +
         string.Format("-an \"{0}_s.jpg\"", strFilenamewithoutExtension);
 
       string ExtractorFallbackArgs =
         string.Format("-loglevel quiet -ss 5 ") +
         string.Format("-i \"{0}\" ", aVideoPath) +
-        string.Format("-vf {0} ", ffmpegArgs) +
+        string.Format("-vf {0} ", ffmpegFallbackArgs) +
         string.Format("-vframes 1 -vsync 0 ") +
         string.Format("-an \"{0}_s.jpg\"", strFilenamewithoutExtension);
 
@@ -113,19 +148,20 @@ namespace TvThumbnails.VideoThumbCreator
         if ((Thumbs.LeaveShareThumb && !File.Exists(ShareThumb)) // No thumb in share although it should be there
             || (!Thumbs.LeaveShareThumb && !File.Exists(aThumbPath))) // No thumb cached and no chance to find it in share
         {
-          //Log.Debug("VideoThumbCreator: No thumb in share {0} - trying to create one with arguments: {1}", ShareThumb, ExtractorArgs);
-          Success = StartProcess(_extractorPath, ExtractorArgs, TempPath, 15000, true, GetMtnConditions());
+          Log.Debug("VideoThumbCreator: No thumb in share {0} - 1st trying to create one with arguments: {1}", ShareThumb, ExtractorArgs);
+          Success = StartProcess(_extractorPath, ExtractorArgs, TempPath, 120000, true, GetMtnConditions());
           if (!Success)
           {
             // Maybe the pre-gap was too large or not enough sharp & light scenes could be caught
-            Thread.Sleep(100);
-            Success = StartProcess(_extractorPath, ExtractorFallbackArgs, TempPath, 30000, true, GetMtnConditions());
+            Log.Debug("VideoThumbCreator: 1st trying was not success, 2nd trying in progress with ExtractorFallbackArgs: {0}", ExtractorFallbackArgs);
+            Thread.Sleep(500);
+            Success = StartProcess(_extractorPath, ExtractorFallbackArgs, TempPath, 120000, true, GetMtnConditions());
             if (!Success)
               Log.Info("VideoThumbCreator: {0} has not been executed successfully with arguments: {1}", _extractApp,
                        ExtractorFallbackArgs);
           }
           // give the system a few IO cycles
-          Thread.Sleep(100);
+          Thread.Sleep(500);
           // make sure there's no process hanging
           KillProcess(Path.ChangeExtension(_extractApp, null));
           try
@@ -143,7 +179,7 @@ namespace TvThumbnails.VideoThumbCreator
             {
               // Clean up
               File.Delete(OutputThumb);
-              Thread.Sleep(50);
+              Thread.Sleep(100);
             }
             catch (Exception)
             {
@@ -341,7 +377,7 @@ namespace TvThumbnails.VideoThumbCreator
     /// </param>
     /// <param name="aFastMode">Use low quality resizing without interpolation suitable for small thumbnails</param>
     /// <returns>Whether the thumb has been successfully created</returns>
-    private static bool CreateThumbnail(string aInputFilename, string aThumbTargetPath, 
+    private static bool CreateThumbnail(string aInputFilename, string aThumbTargetPath,
                                         int iMaxWidth, int iMaxHeight, int iRotate)
     {
       if (string.IsNullOrEmpty(aInputFilename) || string.IsNullOrEmpty(aThumbTargetPath) || iMaxHeight <= 0 ||
@@ -503,16 +539,16 @@ namespace TvThumbnails.VideoThumbCreator
         Log.Info("Util: StdErr - {0}", errLine.Data);
       }
     }
-  }
 
-  internal class ProcessFailedConditions
-  {
-    public List<string> CriticalOutputLines = new List<string>();
-    public int SuccessExitCode = 0;
-
-    internal void AddCriticalOutString(string aFailureString)
+    internal class ProcessFailedConditions
     {
-      CriticalOutputLines.Add(aFailureString);
+      public List<string> CriticalOutputLines = new List<string>();
+      public int SuccessExitCode = 0;
+
+      internal void AddCriticalOutString(string aFailureString)
+      {
+        CriticalOutputLines.Add(aFailureString);
+      }
     }
   }
 }

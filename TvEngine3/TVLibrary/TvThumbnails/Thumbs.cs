@@ -79,7 +79,7 @@ namespace TvThumbnails
 
     private static ImageCodecInfo _currentImageCodecInfo;
     private static EncoderParameters _currentEncoderParams;
-
+    private static int _TimeOffset = 1;
     public static void LoadSettings()
     {
       Log.Debug("Thumbs.LoadSettings()");
@@ -96,6 +96,8 @@ namespace TvThumbnails
         _previewColumns = Convert.ToInt32(layer.GetSetting("TVThumbnailsColumns", "1").Value);
 
         _previewRows = Convert.ToInt32(layer.GetSetting("TVThumbnailsRows", "1").Value);
+
+        _TimeOffset = Convert.ToInt32(layer.GetSetting("TimeOffset", "1").Value);
 
         int configQuality = Convert.ToInt32(layer.GetSetting("TVThumbnailsQuality", "4").Value);
         Log.Debug("Thumbs.LoadSettings: Thumbs quality: {0}", configQuality);
@@ -167,6 +169,11 @@ namespace TvThumbnails
     public static int PreviewRows
     {
       get { return _previewRows; }
+    }
+
+    public static int TimeOffset
+    {
+      get { return _TimeOffset; }
     }
 
     public static string ThumbnailFolder
