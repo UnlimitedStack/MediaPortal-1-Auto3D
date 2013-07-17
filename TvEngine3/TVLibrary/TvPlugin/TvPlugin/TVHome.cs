@@ -571,7 +571,7 @@ namespace TvPlugin
 
     private void AutoTurnOnTv(Channel channel)
     {
-      if (_autoTurnOnTv && !_playbackStopped && !wasPrevWinTVplugin())
+      if (_autoTurnOnTv && !_playbackStopped)
       {
         if (!wasPrevWinTVplugin())
         {
@@ -1680,6 +1680,9 @@ namespace TvPlugin
         HandleWakeUpTvServer();
         startHeartBeatThread();
         _notifyManager.Start();
+
+        // Init Channel after resume.
+        Channel _resumeChannel = Navigator.Channel;
         if (_resumeChannel != null)
         {
           Log.Debug("TVHome.OnResume() - automatically turning on TV: {0}", _resumeChannel.DisplayName);
