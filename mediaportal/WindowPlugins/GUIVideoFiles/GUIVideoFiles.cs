@@ -1521,8 +1521,9 @@ namespace MediaPortal.GUI.Video
               Log.Debug("Refresh success!");
               if (facadeLayout.ListLayout.ListItems.Count > 0 && !string.IsNullOrEmpty(_currentFolder))
               {
-                facadeLayout.SelectedListItemIndex = 0;
+                selectedIndex = facadeLayout.SelectedListItemIndex;
                 LoadDirectory(_currentFolder, false);
+                facadeLayout.SelectedListItemIndex = selectedIndex;
               }
             }
           }
