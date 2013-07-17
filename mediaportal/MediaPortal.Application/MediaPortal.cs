@@ -1569,17 +1569,20 @@ public class MediaPortalApp : D3D, IRender
 
       // When resuming from hibernation, the OS always assume that a user is present. This is by design of Windows.
       case PBT_APMRESUMEAUTOMATIC:
+        PluginManager.WndProc(ref msg);
         OnResume(); // no special handling of automatic resume yet
         break;
 
       // only for Windows XP
       case PBT_APMRESUMECRITICAL:
         Log.Info("Main: Resuming operation");
+        PluginManager.WndProc(ref msg);
         OnResume();
         break;
 
       case PBT_APMRESUMESUSPEND:
         Log.Info("Main: Resuming operation");
+        PluginManager.WndProc(ref msg);
         OnResume();
         break;
 

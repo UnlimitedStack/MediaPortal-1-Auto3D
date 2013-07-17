@@ -68,7 +68,6 @@ namespace TvPlugin
     private const int PBT_APMQUERYSUSPENDFAILED = 0x0002;
     private const int PBT_APMQUERYSTANDBYFAILED = 0x0003;
     private const int PBT_APMSUSPEND = 0x0004;
-    private const int PBT_APMSTANDBY = 0x0005;
     private const int PBT_APMRESUMECRITICAL = 0x0006;
     private const int PBT_APMRESUMESUSPEND = 0x0007;
     private const int PBT_APMRESUMESTANDBY = 0x0008;
@@ -116,6 +115,7 @@ namespace TvPlugin
     private static bool _preferAudioTypeOverLang = false;
     private static bool _autoFullScreen = false;
     private static bool _suspended = false;
+    private static bool _resuming = false;
     private static bool _showlastactivemodule = false;
     private static bool _showlastactivemoduleFullscreen = false;
     private static bool _playbackStopped = false;
@@ -126,6 +126,7 @@ namespace TvPlugin
     private static bool _doingChannelChange = false;
     private static bool _ServerNotConnectedHandled = false;
     private static bool _recoverTV = false;
+    private static bool _resumeFromStanby = false;
     private static bool _connected = false;
     private static bool _isAnyCardRecording = false;
     protected static TvServer _server;
@@ -563,13 +564,13 @@ namespace TvPlugin
       }
 
       _onPageLoadDone = true;
-      _suspended = false;
+      //_suspended = false; // Need to know if it's really needed
 
       UpdateGUIonPlaybackStateChange();
       UpdateCurrentChannel();
     }
 
-    private void AutoTurnOnTv(Channel channel)
+    private static void AutoTurnOnTv(Channel channel)
     {
       if (_autoTurnOnTv && !_playbackStopped)
       {
@@ -581,7 +582,7 @@ namespace TvPlugin
       }
     }
 
-    private void AutoFullScreenTv()
+    private static void AutoFullScreenTv()
     {
       if (_autoFullScreen)
       {
@@ -593,7 +594,7 @@ namespace TvPlugin
           if (isTvOrRec)
           {
             Log.Debug("GUIGraphicsContext.IsFullScreenVideo {0}", GUIGraphicsContext.IsFullScreenVideo);
-            bool wasFullScreenTV = (PreviousWindowId == (int)Window.WINDOW_TVFULLSCREEN);
+            bool wasFullScreenTV = (GUIWindowManager.GetWindow(GUIWindowManager.ActiveWindow).PreviousWindowId == (int)Window.WINDOW_TVFULLSCREEN);
 
             if (!wasFullScreenTV)
             {
@@ -1391,6 +1392,20 @@ namespace TvPlugin
         firstNotLoaded = false;
         OnLoaded();
       }
+      if (_resumeFromStanby)
+      {
+        // Init Channel after resume and after the connection to TVService is done
+        _resumeFromStanby = false;
+        Channel _resumeChannel = Navigator.Channel;
+        if (_resumeChannel != null)
+        {
+          Log.Debug("TVHome.OnResume() - automatically turning on TV: {0}", _resumeChannel.DisplayName);
+          AutoTurnOnTv(_resumeChannel);
+          AutoFullScreenTv();
+          _resumeChannel = null;
+        }
+        _resuming = false;
+      }
     }
 
     private static void RemoteControl_OnRemotingDisconnected()
@@ -1620,7 +1635,7 @@ namespace TvPlugin
       Log.Debug("TVHome.OnSelecChannel(): Total Time {0} ms", benchClock.ElapsedMilliseconds.ToString());
     }
 
-    private void TvDelayThread()
+    private static void TvDelayThread()
     {
       //we have to use a small delay before calling tvfullscreen.                                    
       Thread.Sleep(200);
@@ -1642,6 +1657,12 @@ namespace TvPlugin
 
     private void OnSuspend()
     {
+      // OnSuspend already in progress
+      if (_suspended)
+      {
+        Log.Info("TVHome: Suspend is already in progress");
+        return;
+      }
       Log.Debug("TVHome.OnSuspend()");
 
       RemoteControl.OnRemotingDisconnected -=
@@ -1670,6 +1691,16 @@ namespace TvPlugin
 
     private void OnResume()
     {
+      if (_resuming)
+      {
+        Log.Info("TVHome: Resuming is already in progress");
+        return;
+      }
+
+      // Init only once OnResume
+      _resuming = true;
+      _resumeFromStanby = true;
+
       Log.Debug("TVHome.OnResume()");
       try
       {
@@ -1680,16 +1711,6 @@ namespace TvPlugin
         HandleWakeUpTvServer();
         startHeartBeatThread();
         _notifyManager.Start();
-
-        // Init Channel after resume.
-        Channel _resumeChannel = Navigator.Channel;
-        if (_resumeChannel != null)
-        {
-          Log.Debug("TVHome.OnResume() - automatically turning on TV: {0}", _resumeChannel.DisplayName);
-          AutoTurnOnTv(_resumeChannel);
-          AutoFullScreenTv();
-          _resumeChannel = null;
-        }
       }
       finally
       {
@@ -1713,10 +1734,6 @@ namespace TvPlugin
       {
         switch (msg.WParam.ToInt32())
         {
-          case PBT_APMSTANDBY:
-            Log.Info("TVHome.WndProc(): Windows is going to standby");
-            OnSuspend();
-            break;
           case PBT_APMSUSPEND:
             Log.Info("TVHome.WndProc(): Windows is suspending");
             OnSuspend();
@@ -1724,7 +1741,7 @@ namespace TvPlugin
           case PBT_APMQUERYSUSPEND:
           case PBT_APMQUERYSTANDBY:
             Log.Info("TVHome.WndProc(): Windows is going into powerstate (hibernation/standby)");
-
+            OnSuspend();
             break;
           case PBT_APMRESUMESUSPEND:
             Log.Info("TVHome.WndProc(): Windows has resumed from hibernate mode");
@@ -1732,6 +1749,10 @@ namespace TvPlugin
             break;
           case PBT_APMRESUMESTANDBY:
             Log.Info("TVHome.WndProc(): Windows has resumed from standby mode");
+            OnResume();
+            break;
+          case PBT_APMRESUMEAUTOMATIC:
+            Log.Info("TVHome.WndProc(): Windows has resumed from standby mode trigger by user");
             OnResume();
             break;
         }
