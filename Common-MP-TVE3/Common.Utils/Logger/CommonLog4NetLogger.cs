@@ -262,20 +262,20 @@ namespace MediaPortal.Common.Utils.Logger
     protected string FormatException(Exception ex)
     {
       var sb = new StringBuilder();
-      sb.AppendFormat("Exception: " + SafeString(ex.ToString()));
-      sb.AppendFormat("  Message: " + SafeString(ex.Message));
-      sb.AppendFormat("  Site   : " + ex.TargetSite);
-      sb.AppendFormat("  Source : " + ex.Source);
+      sb.AppendLine("Exception: " + SafeString(ex.ToString()));
+      sb.AppendLine("  Message: " + SafeString(ex.Message));
+      sb.AppendLine("  Site   : " + ex.TargetSite);
+      sb.AppendLine("  Source : " + ex.Source);
       if (ex.InnerException != null)
       {
-        sb.AppendFormat("  Inner Exception(s):");
+        sb.AppendLine("  Inner Exception(s):");
         {
           var stack = new Stack<Exception>();
           stack.Push(ex);
           while (stack.Count > 0)
           {
             var except = stack.Pop();
-            sb.AppendFormat("  -> " + except.Message);
+            sb.AppendLine("  -> " + except.Message);
             if (except.InnerException != null)
             {
               stack.Push(except.InnerException);
@@ -283,8 +283,8 @@ namespace MediaPortal.Common.Utils.Logger
           }
         }
       }
-      sb.AppendFormat("  Stack Trace:");
-      sb.AppendFormat("  " + ex.StackTrace);
+      sb.AppendLine("  Stack Trace:");
+      sb.AppendLine("  " + ex.StackTrace);
       return sb.ToString();
     }
 
