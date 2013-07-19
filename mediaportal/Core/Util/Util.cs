@@ -3907,6 +3907,155 @@ namespace MediaPortal.Util
       return result;
     }
 
+    public static bool CreateVideoThumbV2(List<string> aPictureList, string aThumbPath, int PreviewColumns, int PreviewRows)
+    {
+      bool result = false;
+
+      if (aPictureList.Count > 0)
+      {
+        try
+        {
+          string defaultBackground;
+          string currentSkin = GUIGraphicsContext.Skin;
+
+          // when launched by configuration exe this might be the case
+          if (string.IsNullOrEmpty(currentSkin))
+          {
+            using (Profile.Settings xmlreader = new Profile.MPSettings())
+            {
+              currentSkin = Config.Dir.Config + @"\skin\" + xmlreader.GetValueAsString("skin", "name", "Default");
+            }
+            defaultBackground = currentSkin + @"\media\previewbackground.png";
+          }
+          else
+          {
+            defaultBackground = GUIGraphicsContext.GetThemedSkinFile(@"\media\previewbackground.png");
+          }
+          
+          using (FileStream fs = new FileStream(defaultBackground, FileMode.Open, FileAccess.Read))
+          {
+            using (Image imgFolder = Image.FromStream(fs, true, false))
+            {
+              int width = imgFolder.Width;
+              int height = imgFolder.Height;
+
+              int thumbnailWidth = 256;
+              int thumbnailHeight = 256;
+              // draw a fullsize thumb if only 1 pic is available
+              if (aPictureList.Count == 1)
+              {
+                thumbnailWidth = width;
+                thumbnailHeight = height;
+              }
+              else
+              {
+                thumbnailWidth = width / 2;
+                thumbnailHeight = height / 2;
+              }
+
+              using (Bitmap bmp = new Bitmap(width, height))
+              {
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                  g.CompositingQuality = Thumbs.Compositing;
+                  g.InterpolationMode = Thumbs.Interpolation;
+                  g.SmoothingMode = Thumbs.Smoothing;
+
+                  g.DrawImage(imgFolder, 0, 0, width, height);
+                  int x, y, w, h;
+                  x = 0;
+                  y = 0;
+                  w = thumbnailWidth;
+                  h = thumbnailHeight;
+             
+                  try
+                  {
+                    switch (aPictureList.Count)
+                    {
+                      case 1:
+                        AddPicture(g, (string)aPictureList[0], x, y, w, h);
+                        break;
+                      case 2:
+                        if (PreviewColumns == 1 && PreviewRows == 2)
+                        {
+                          AddPicture(g, (string)aPictureList[0], x, y, w * 2, h);
+                          AddPicture(g, (string)aPictureList[1], x, y + thumbnailHeight, w * 2, h);
+                        }
+                        else
+                        {
+                          AddPicture(g, (string)aPictureList[0], x, y, w, h * 2);
+                          AddPicture(g, (string)aPictureList[1], x + thumbnailWidth, y, w, h * 2);
+                        }
+                        break;
+                      case 4:
+                        AddPicture(g, (string)aPictureList[0], x, y, w, h);
+                        AddPicture(g, (string)aPictureList[1], x + thumbnailWidth, y, w, h);
+                        AddPicture(g, (string)aPictureList[2], x, y + thumbnailHeight, w, h);
+                        AddPicture(g, (string)aPictureList[3], x + thumbnailWidth, y + thumbnailHeight, w, h);
+                        break;
+                    }
+                  }
+                  catch (Exception ex)
+                  {
+                    Log.Error("Utils: An exception occured creating folder preview thumb: {0}", ex.Message);
+                  }
+                } //using (Graphics g = Graphics.FromImage(bmp) )
+
+                try
+                {
+                  string tmpFile = Path.GetTempFileName();
+                  Log.Debug("CreateVideoThumbV2: Saving thumb!");
+                  bmp.Save(tmpFile, Thumbs.ThumbCodecInfo, Thumbs.ThumbEncoderParams);
+
+                  aThumbPath = Util.Utils.ConvertToLargeCoverArt(aThumbPath);
+                  Picture.CreateThumbnail(tmpFile, aThumbPath, (int)Thumbs.ThumbLargeResolution,
+                                            (int)Thumbs.ThumbLargeResolution, 0, false);
+                  FileDelete(tmpFile);
+
+                  for (int i = 0; i < (aPictureList.Count); i++)
+                    try
+                    {
+                      File.Delete(aPictureList[i]);
+                    }
+                    catch (FileNotFoundException)
+                    {
+                      Log.Debug("VideoThumbCreator: {0} file not found.", aPictureList[i]);
+                    }
+
+                  if (MediaPortal.Player.g_Player.Playing)
+                    Thread.Sleep(100);
+                  else
+                    Thread.Sleep(10);
+
+                  if (FileExistsInCache(aThumbPath))
+                    result = true;
+                }
+                catch (Exception ex2)
+                {
+                  Log.Error("Utils: An exception occured saving folder preview thumb: {0} - {1}", aThumbPath,
+                            ex2.Message);
+                }
+              } //using (Bitmap bmp = new Bitmap(210,210))
+            }
+          }
+        }
+        catch (FileNotFoundException)
+        {
+          Log.Warn("Utils: Your skin does not supply previewbackground.png to create folder preview thumbs!");
+        }
+        catch (Exception exm)
+        {
+          Log.Error("Utils: An error occured creating folder preview thumbs: {0}", exm.Message);
+        }
+
+      } 
+      else
+      {
+        result = false;
+      }
+      return result;
+    }
+
     public static string GetThumbExtension()
     {
       if (Thumbs.ThumbFormat == ImageFormat.Jpeg)
