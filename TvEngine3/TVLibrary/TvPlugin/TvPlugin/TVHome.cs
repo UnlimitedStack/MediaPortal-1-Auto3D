@@ -1394,16 +1394,6 @@ namespace TvPlugin
       }
       if (_resumeFromStanby)
       {
-        // Init Channel after resume and after the connection to TVService is done
-        _resumeFromStanby = false;
-        Channel _resumeChannel = Navigator.Channel;
-        if (_resumeChannel != null)
-        {
-          Log.Debug("TVHome.OnResume() - automatically turning on TV: {0}", _resumeChannel.DisplayName);
-          AutoTurnOnTv(_resumeChannel);
-          AutoFullScreenTv();
-          _resumeChannel = null;
-        }
         _resuming = false;
       }
     }
@@ -1711,10 +1701,21 @@ namespace TvPlugin
         HandleWakeUpTvServer();
         startHeartBeatThread();
         _notifyManager.Start();
+
+        // Init Channel after resume
+        _resumeFromStanby = false;
+        Channel _resumeChannel = Navigator.Channel;
+        if (_resumeChannel != null)
+        {
+          Log.Debug("TVHome.OnResume() - automatically turning on TV: {0}", _resumeChannel.DisplayName);
+          AutoTurnOnTv(_resumeChannel);
+          AutoFullScreenTv();
+        }
       }
       finally
       {
         _suspended = false;
+        _resumeChannel = null;
       }
     }
 
