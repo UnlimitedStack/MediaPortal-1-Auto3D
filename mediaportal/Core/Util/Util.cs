@@ -3908,7 +3908,7 @@ namespace MediaPortal.Util
       return result;
     }
 
-    public static Image ResizeImage(Image image, Size size, bool preserveAspectRatio = true)
+    public static Image ResizeImage(Image image, Size size, bool preserveAspectRatio)
     {
       int newWidth;
       int newHeight;
