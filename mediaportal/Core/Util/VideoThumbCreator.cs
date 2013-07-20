@@ -213,9 +213,9 @@ namespace MediaPortal.Util
             }
           }
 
-          if (i == PreviewColumns * PreviewRows - 1)
+          if (i == PreviewColumns * PreviewRows)
           {
-            if (Util.Utils.CreateVideoThumbV2(pictureList, string.Format("{0}.jpg", strFilenamewithoutExtension), PreviewColumns, PreviewRows))
+            if (Util.Utils.CreateTileThumb(pictureList, string.Format("{0}.jpg", strFilenamewithoutExtension), PreviewColumns, PreviewRows))
             {
               Log.Debug("VideoThumbCreator: thumb creation success {0}", strFilenamewithoutExtension);
             }
@@ -292,6 +292,24 @@ namespace MediaPortal.Util
             Thread.Sleep(30);
           }
           catch (Exception) {}
+        }
+        
+        // Remove left over files if needed
+        if (pictureList.Count > 0)
+        {
+          string pictureListName = string.Empty;
+          try
+          {
+            for (int i = 0; i < (pictureList.Count); i++)
+            {
+              pictureListName = pictureList[i];
+              File.Delete(pictureList[i]);
+            }
+          }
+          catch (FileNotFoundException)
+          {
+            Log.Debug("VideoThumbCreator: {0} file not found.", pictureListName);
+          }
         }
       }
       catch (Exception ex)
