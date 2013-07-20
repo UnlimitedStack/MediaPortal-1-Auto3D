@@ -4041,13 +4041,22 @@ namespace MediaPortal.Util
                 bmp.Save(tmpFile, Thumbs.ThumbCodecInfo, Thumbs.ThumbEncoderParams);
                 Log.Debug("CreateTileThumb: Saving thumb!");
 
-                aThumbPath = Util.Utils.ConvertToLargeCoverArt(aThumbPath);
                 Picture.CreateThumbnail(tmpFile, aThumbPath, (int)Thumbs.ThumbLargeResolution,
                                           (int)Thumbs.ThumbLargeResolution, 0, false);
                 FileDelete(tmpFile);
 
                 if (defaultBackgroundResized != null)
+                {
                   defaultBackgroundResized.Dispose();
+                }
+                if (defaultBackgroundOriginal != null)
+                {
+                  defaultBackgroundOriginal.Dispose();
+                }
+                if (img != null)
+                {
+                  img.Dispose();
+                }
 
                 if (aPictureList.Count > 0)
                 {

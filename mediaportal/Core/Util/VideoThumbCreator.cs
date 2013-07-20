@@ -174,10 +174,11 @@ namespace MediaPortal.Util
         string TempPath = Path.GetTempPath();
         string OutputThumb = string.Format("{0}{1}", Path.ChangeExtension(aVideoPath, null), ".jpg");
         string ShareThumb = OutputThumb.Replace(".jpg", ".jpg");
+        List<string> pictureList = new List<string>();
 
         if ((LeaveShareThumb && !Util.Utils.FileExistsInCache(ShareThumb))
             // No thumb in share although it should be there 
-            || (LeaveShareThumb && aOmitCredits)
+            || (aOmitCredits)
             // or a refress needs by user (from context menu)
             || (!LeaveShareThumb && !Util.Utils.FileExistsInCache(aThumbPath)))
           // No thumb cached and no chance to find it in share
@@ -190,7 +191,6 @@ namespace MediaPortal.Util
 
           string ffmpegArgs = null;
           string ExtractorArgs = null;
-          List<string> pictureList = new List<string>();
           int TimeOffset = 0;
           int i;
 
@@ -212,12 +212,13 @@ namespace MediaPortal.Util
               pictureList.Add(string.Format("{0}_{1}.jpg", strFilenamewithoutExtension, i));
             }
           }
-
+          // generate thumb if all sub pictures was created
           if (i == PreviewColumns * PreviewRows)
           {
             if (Util.Utils.CreateTileThumb(pictureList, string.Format("{0}.jpg", strFilenamewithoutExtension), PreviewColumns, PreviewRows))
             {
-              Log.Debug("VideoThumbCreator: thumb creation success {0}", strFilenamewithoutExtension);
+              Log.Debug("VideoThumbCreator: thumb creation success {0}", ShareThumb);
+              File.SetAttributes(ShareThumb, File.GetAttributes(ShareThumb) & ~FileAttributes.Hidden);
             }
             else
             {
@@ -233,37 +234,14 @@ namespace MediaPortal.Util
             if (!Success)
             {
               Log.Info("VideoThumbCreator: {0} has not been executed successfully with arguments: {1}", ExtractApp, ExtractorFallbackArgs);
-              Utils.KillProcess(Path.ChangeExtension(ExtractApp, null));
-              return false;
+              /*Utils.KillProcess(Path.ChangeExtension(ExtractApp, null));
+              return false;*/
             }
           }
           // give the system a few IO cycles
           Thread.Sleep(100);
           // make sure there's no process hanging
           Utils.KillProcess(Path.ChangeExtension(ExtractApp, null));
-          try
-          {
-            string LargeThumb = Path.ChangeExtension(OutputThumb, null) + "L.jpg";
-            if (File.Exists(LargeThumb))
-            {
-              File.Move(LargeThumb, ShareThumb);
-              File.SetAttributes(ShareThumb, File.GetAttributes(ShareThumb) & ~FileAttributes.Hidden);
-            }
-          }
-          catch (FileNotFoundException)
-          {
-            Log.Debug("VideoThumbCreator: {0} did not extract a thumbnail to: {1}", ExtractApp, OutputThumb);
-          }
-          catch (Exception)
-          {
-            try
-            {
-              // Clean up
-              File.Delete(OutputThumb);
-              Thread.Sleep(50);
-            }
-            catch (Exception) {}
-          }
         }
         else
         {
@@ -293,7 +271,7 @@ namespace MediaPortal.Util
           }
           catch (Exception) {}
         }
-        
+
         // Remove left over files if needed
         if (pictureList.Count > 0)
         {
