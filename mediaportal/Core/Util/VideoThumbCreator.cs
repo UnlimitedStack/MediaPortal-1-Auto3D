@@ -174,7 +174,6 @@ namespace MediaPortal.Util
         string TempPath = Path.GetTempPath();
         string OutputThumb = string.Format("{0}{1}", Path.ChangeExtension(aVideoPath, null), ".jpg");
         string ShareThumb = OutputThumb.Replace(".jpg", ".jpg");
-        List<string> pictureList = new List<string>();
 
         if ((LeaveShareThumb && !Util.Utils.FileExistsInCache(ShareThumb))
             // No thumb in share although it should be there 
@@ -189,6 +188,7 @@ namespace MediaPortal.Util
             File.Delete(ShareThumb);
           }
 
+          List<string> pictureList = new List<string>();
           string ffmpegArgs = null;
           string ExtractorArgs = null;
           int TimeOffset = 0;
@@ -273,7 +273,8 @@ namespace MediaPortal.Util
         }
 
         // Remove left over files if needed
-        if (pictureList.Count > 0)
+        // Need to revise the logic here
+        /*if (pictureList.Count > 0)
         {
           string pictureListName = string.Empty;
           try
@@ -288,7 +289,7 @@ namespace MediaPortal.Util
           {
             Log.Debug("VideoThumbCreator: {0} file not found.", pictureListName);
           }
-        }
+        }*/
       }
       catch (Exception ex)
       {
