@@ -161,20 +161,24 @@ namespace MediaPortal.Util
       TimeBetweenThumbs = (Duration - preGapSec) / 4;
 
       Log.Debug("{0} duration is {1}.", aVideoPath, Duration);
-
-      string strFilenamewithoutExtension = Path.ChangeExtension(aVideoPath, null);
-      string ffmpegFallbackArgs = string.Format("select=isnan(prev_selected_t)+gte(t-prev_selected_t" + "\\" + ",{0}),yadif=0:-1:0,scale=600:337,setsar=1:1,tile={1}x{2}", 5, PreviewColumns, PreviewRows);
-      string ExtractorFallbackArgs = string.Format("-loglevel quiet -ss {0} -i \"{1}\" -vf {2} -vframes 1 -vsync 0 -an \"{3}.jpg\"", 5, aVideoPath, ffmpegFallbackArgs, strFilenamewithoutExtension);
       
       // Honour we are using a unix app
       //ExtractorArgs = ExtractorArgs.Replace('\\', '/');
       try
       {
+        // Set String
+        string strFilenamewithoutExtension = Path.ChangeExtension(aVideoPath, null);
         // Use this for the working dir to be on the safe side
         string TempPath = Path.GetTempPath();
         string OutputThumb = string.Format("{0}{1}", Path.ChangeExtension(aVideoPath, null), ".jpg");
         string ShareThumb = OutputThumb.Replace(".jpg", ".jpg");
-
+        // Use Temp folder 
+        string strFilenamewithoutExtensionTemp = Path.GetTempPath() + Path.GetFileName(strFilenamewithoutExtension);
+        string ShareThumbTemp = Path.GetTempPath() + Path.GetFileName(ShareThumb);
+        // ffmpeg
+        string ffmpegFallbackArgs = string.Format("select=isnan(prev_selected_t)+gte(t-prev_selected_t" + "\\" + ",{0}),yadif=0:-1:0,scale=600:337,setsar=1:1,tile={1}x{2}", 5, PreviewColumns, PreviewRows);
+        string ExtractorFallbackArgs = string.Format("-loglevel quiet -ss {0} -i \"{1}\" -vf {2} -vframes 1 -vsync 0 -an \"{3}.jpg\"", 5, aVideoPath, ffmpegFallbackArgs, strFilenamewithoutExtensionTemp);
+        
         if ((LeaveShareThumb && !Util.Utils.FileExistsInCache(ShareThumb))
             // No thumb in share although it should be there 
             || (aOmitCredits)
@@ -199,30 +203,30 @@ namespace MediaPortal.Util
             TimeOffset = preGapSec + i * TimeBetweenThumbs;
 
             ffmpegArgs = string.Format("select=isnan(prev_selected_t)+gte(t-prev_selected_t" + "\\" + ",{0}),yadif=0:-1:0,scale=600:337,setsar=1:1,tile={1}x{2}", 1, 1, 1);
-            ExtractorArgs = string.Format("-loglevel quiet -ss {0} -i \"{1}\" -vf {2} -vframes 1 -vsync 0 -an \"{3}_{4}.jpg\"", TimeOffset, aVideoPath, ffmpegArgs, strFilenamewithoutExtension, i);
+            ExtractorArgs = string.Format("-loglevel quiet -ss {0} -i \"{1}\" -vf {2} -vframes 1 -vsync 0 -an \"{3}_{4}.jpg\"", TimeOffset, aVideoPath, ffmpegArgs, strFilenamewithoutExtensionTemp, i);
             Success = Utils.StartProcess(ExtractorPath, ExtractorArgs, TempPath, 120000, true, GetMtnConditions());
             Log.Debug("VideoThumbCreator: thumb creation {0}", ExtractorArgs);
             if (!Success)
             {
-              Log.Debug("VideoThumbCreator: failed, try to fallback {0}", strFilenamewithoutExtension);
+              Log.Debug("VideoThumbCreator: failed, try to fallback {0}", strFilenamewithoutExtensionTemp);
               break;
             }
             else
             {
-              pictureList.Add(string.Format("{0}_{1}.jpg", strFilenamewithoutExtension, i));
+              pictureList.Add(string.Format("{0}_{1}.jpg", strFilenamewithoutExtensionTemp, i));
             }
           }
           // generate thumb if all sub pictures was created
           if (i == PreviewColumns * PreviewRows)
           {
-            if (Util.Utils.CreateTileThumb(pictureList, string.Format("{0}.jpg", strFilenamewithoutExtension), PreviewColumns, PreviewRows))
+            if (Util.Utils.CreateTileThumb(pictureList, string.Format("{0}.jpg", strFilenamewithoutExtensionTemp), PreviewColumns, PreviewRows))
             {
-              Log.Debug("VideoThumbCreator: thumb creation success {0}", ShareThumb);
-              File.SetAttributes(ShareThumb, File.GetAttributes(ShareThumb) & ~FileAttributes.Hidden);
+              Log.Debug("VideoThumbCreator: thumb creation success {0}", ShareThumbTemp);
+              File.SetAttributes(ShareThumbTemp, File.GetAttributes(ShareThumbTemp) & ~FileAttributes.Hidden);
             }
             else
             {
-              Log.Debug("VideoThumbCreator: failed, try to fallback {0}", strFilenamewithoutExtension);
+              Log.Debug("VideoThumbCreator: failed, try to fallback {0}", strFilenamewithoutExtensionTemp);
             }
 
           }
@@ -254,10 +258,10 @@ namespace MediaPortal.Util
 
         if (aCacheThumb && Success)
         {
-          if (Picture.CreateThumbnailVideo(ShareThumb, aThumbPath, (int)Thumbs.ThumbResolution, (int)Thumbs.ThumbResolution,
+          if (Picture.CreateThumbnailVideo(ShareThumbTemp, aThumbPath, (int)Thumbs.ThumbResolution, (int)Thumbs.ThumbResolution,
                                       0, false))
           {
-            Picture.CreateThumbnailVideo(ShareThumb, Utils.ConvertToLargeCoverArt(aThumbPath),
+            Picture.CreateThumbnailVideo(ShareThumbTemp, Utils.ConvertToLargeCoverArt(aThumbPath),
                                     (int) Thumbs.ThumbLargeResolution, (int) Thumbs.ThumbLargeResolution, 0, false);
           }
         }
@@ -266,10 +270,19 @@ namespace MediaPortal.Util
         {
           try
           {
-            File.Delete(ShareThumb);
+            File.Delete(ShareThumbTemp);
             Thread.Sleep(30);
           }
-          catch (Exception) {}
+          catch (Exception) { }
+        }
+        else if (!File.Exists(ShareThumb))
+        {
+          try
+          {
+            File.Move(ShareThumbTemp, ShareThumb);
+            File.SetAttributes(ShareThumb, File.GetAttributes(ShareThumb) & ~FileAttributes.Hidden);
+          }
+          catch (Exception) { }
         }
 
         // Remove left over files if needed
