@@ -1514,7 +1514,7 @@ namespace MediaPortal.GUI.Video
           if (Util.Utils.FileExistsInCache(item.Path))
           {
             string strThumbPath = Util.Utils.GetVideosThumbPathname(item.Path);
-            Util.Utils.GetVideoThumb(item);
+            Util.Utils.SetThumbnails(ref item);
             bool success = Util.VideoThumbCreator.CreateVideoThumb(item.Path, strThumbPath, true, true);
             if (success)
             {

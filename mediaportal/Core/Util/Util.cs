@@ -587,7 +587,10 @@ namespace MediaPortal.Util
 
     public static void SetDefaultIcons(GUIListItem item)
     {
-      if (item == null) return;
+      if (item == null)
+      {
+        return;
+      }
       if (!item.IsFolder)
       {
         if (IsPlayList(item.Path))
@@ -761,7 +764,7 @@ namespace MediaPortal.Util
           }
           return;
         }
-        if (item.ThumbnailImage == string.Empty)
+        if (item.ThumbnailImage == string.Empty && FileExistsInCache(strThumb))
         {
           item.ThumbnailImage = strThumb;
           item.IconImage = strThumb;
@@ -769,7 +772,10 @@ namespace MediaPortal.Util
         }
         else
         {
-          strThumb = item.ThumbnailImage;
+          if (FileExistsInCache(strThumb))
+          {
+            strThumb = item.ThumbnailImage;
+          }
         }
       }
       else
@@ -788,7 +794,7 @@ namespace MediaPortal.Util
       if (!string.IsNullOrEmpty(strThumb))
       {
         strThumb = ConvertToLargeCoverArt(strThumb);
-        if (FileExistsInCache(strThumb))
+        if (FileExistsInCache(strThumb) && strThumb != item.ThumbnailImage)
         {
           item.ThumbnailImage = strThumb;
         }
@@ -932,12 +938,18 @@ namespace MediaPortal.Util
             }
           }
           if (thumb != null)
-            if (Picture.CreateThumbnail(thumb, strThumb, (int)Thumbs.ThumbLargeResolution,
-                                        (int)Thumbs.ThumbLargeResolution, 0, false))
+          {
+            if (Picture.CreateThumbnail(thumb, strThumb, (int) Thumbs.ThumbLargeResolution,
+                                        (int) Thumbs.ThumbLargeResolution, 0, false))
+            {
               SetThumbnails(ref item);
+            }
+          }
         }
         else
+        {
           SetThumbnails(ref item);
+        }
       }
       catch (COMException comex)
       {
@@ -3718,7 +3730,14 @@ namespace MediaPortal.Util
         //{
         try
         {
-          img = Image.FromFile(strFileName);
+          try
+          {
+            img = ImageFast.FromFile(strFileName);
+          }
+          catch (Exception)
+          {
+            img = Image.FromFile(strFileName);
+          }
           int iRotation = Util.Picture.GetRotateByExif(img);
           switch (iRotation)
           {

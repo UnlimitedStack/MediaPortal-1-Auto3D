@@ -111,14 +111,14 @@ namespace MediaPortal.GUI.Pictures
               Log.Warn("GUIPictures: Omitting outside path {0} from check share {1}", item.Path, path);
               continue;
             }
-            //Thread.Sleep(100);
+            Thread.Sleep(5);
 
             if (CheckPathForHistory(item.Path, false))
             {
               if (!item.IsFolder)
               {
                 int iRotate = PictureDatabase.GetRotation(item.Path);
-                //Thread.Sleep(30);
+                Thread.Sleep(5);
 
                 bool isVideo = Util.Utils.IsVideo(item.Path);
                 bool isPicture = Util.Utils.IsPicture(item.Path);
@@ -142,7 +142,7 @@ namespace MediaPortal.GUI.Pictures
                   if (recreateThumbs || !File.Exists(thumbnailImage) || !Util.Utils.FileExistsInCache(thumbnailImage) ||
                       !File.Exists(thumbnailImageL) || !Util.Utils.FileExistsInCache(thumbnailImageL))
                   {
-                    //Thread.Sleep(10);
+                    Thread.Sleep(5);
 
                     if (isPicture)
                     {
@@ -175,7 +175,7 @@ namespace MediaPortal.GUI.Pictures
                     }
                     else if (thumbRet)
                     {
-                      //Thread.Sleep(30);
+                      Thread.Sleep(5);
                       Log.Debug("GUIPictures: Creation of missing thumb successful for {0}", item.Path);
                     }
                   }
@@ -244,12 +244,11 @@ namespace MediaPortal.GUI.Pictures
     /// <summary>
     /// creates cached thumbs in MP's thumbs dir
     /// </summary>
-    private void GetThumbnailfile(object i)
+    private void GetThumbnailfile(ref GUIListItem itemObject)
     {
       Thread.CurrentThread.Name = "GUIPictures Thumbnail";
       Stopwatch benchclockfile = new Stopwatch();
       VirtualDirectory vDir = new VirtualDirectory();
-      GUIListItem itemObject = (GUIListItem) i;
       benchclockfile.Start();
       string item = itemObject.Path;
       bool autocreateLargeThumbs = _autocreateLargeThumbs;
@@ -269,6 +268,7 @@ namespace MediaPortal.GUI.Pictures
         }
 
         int iRotate = PictureDatabase.GetRotation(item);
+        Thread.Sleep(5);
 
         bool isVideo = Util.Utils.IsVideo(item);
         bool isPicture = Util.Utils.IsPicture(item);
@@ -296,8 +296,8 @@ namespace MediaPortal.GUI.Pictures
             if (isPicture)
             {
               iRotate = Util.Picture.GetRotateByExif(item);
-              Log.Debug("Picture.GetRotateByExif = {0} for {1}", iRotate, item);
-
+              Log.Debug("Picture.GetRotateByExif = {0} for {1}", iRotate, item); // Test SEB
+              Thread.Sleep(5);
 
               if (autocreateLargeThumbs && !File.Exists(thumbnailImageL))
               {
@@ -322,10 +322,13 @@ namespace MediaPortal.GUI.Pictures
             if (thumbRet && autocreateLargeThumbs)
             {
               Log.Debug("GUIPictures: Creation of missing large thumb successful for {0}", item);
+              Util.Utils.SetThumbnails(ref itemObject);
             }
             else if (thumbRet)
             {
+              Thread.Sleep(5);
               Log.Debug("GUIPictures: Creation of missing thumb successful for {0}", item);
+              Util.Utils.SetThumbnails(ref itemObject);
             }
           }
         }
@@ -1406,11 +1409,6 @@ namespace MediaPortal.GUI.Pictures
       if (!item.IsFolder)
       {
         string thumbnailImage = GetThumbnail(item.Path);
-        if ((!File.Exists(thumbnailImage) || !Util.Utils.FileExistsInCache(thumbnailImage)) && Util.Utils.IsPicture(item.Path))
-        {
-          // creating and starting a thread for potentially every file in a list is very expensive, we should use the threadpool
-          ThreadPool.QueueUserWorkItem(GetThumbnailfile, item);
-        }
         item.IconImage = thumbnailImage;
         if (_autocreateLargeThumbs)
         {
@@ -1420,6 +1418,58 @@ namespace MediaPortal.GUI.Pictures
         else
         {
           item.ThumbnailImage = thumbnailImage;
+        }
+        Util.Utils.SetThumbnails(ref item);
+      }
+      else
+      {
+        if (item.Label != "..")
+        {
+          int pin;
+          if (!virtualDirectory.IsProtectedShare(item.Path, out pin))
+          {
+            Util.Utils.SetThumbnails(ref item);
+          }
+        }
+      }
+    }
+
+    private void OnRetrieveThumbnailFiles(GUIListItem item)
+    {
+      if (item.IsRemote)
+      {
+        return;
+      }
+      Util.Utils.SetDefaultIcons(item);
+      if (!item.IsFolder)
+      {
+        string thumbnailImage = GetThumbnail(item.Path);
+        item.IconImage = thumbnailImage;
+        if (_autocreateLargeThumbs)
+        {
+          string thumbnailLargeImage = GetLargeThumbnail(item.Path);
+          item.ThumbnailImage = thumbnailLargeImage;
+        }
+        else
+        {
+          item.ThumbnailImage = thumbnailImage;
+        }
+
+        if ((!File.Exists(thumbnailImage) || !Util.Utils.FileExistsInCache(thumbnailImage)) &&
+            Util.Utils.IsPicture(item.Path))
+        {
+          ThreadPool.QueueUserWorkItem(delegate
+                                         {
+                                           try
+                                           {
+                                             GetThumbnailfile(ref item);
+                                           }
+                                           catch (Exception ex)
+                                           {
+                                             Log.Error(
+                                               "GUIPictures - Error loading next item (OnRetrieveThumbnailFiles)");
+                                           }
+                                         });
         }
         Util.Utils.SetThumbnails(ref item);
       }
@@ -2419,6 +2469,7 @@ namespace MediaPortal.GUI.Pictures
 
     private void item_OnItemSelected(GUIListItem item, GUIControl parent)
     {
+      OnRetrieveThumbnailFiles(item);
       GUIFilmstripControl filmstrip = parent as GUIFilmstripControl;
       if (filmstrip == null)
       {
