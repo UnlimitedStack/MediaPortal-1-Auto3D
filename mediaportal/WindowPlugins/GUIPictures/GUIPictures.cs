@@ -120,11 +120,10 @@ namespace MediaPortal.GUI.Pictures
                 int iRotate = PictureDatabase.GetRotation(item.Path);
                 Thread.Sleep(5);
 
-                bool isVideo = Util.Utils.IsVideo(item.Path);
                 bool isPicture = Util.Utils.IsPicture(item.Path);
                 bool thumbRet = false;
 
-                if (!item.IsRemote && (isPicture || isVideo))
+                if (!item.IsRemote && isPicture)
                 {
                   string thumbnailImage = null;
                   string thumbnailImageL = null;
@@ -133,25 +132,19 @@ namespace MediaPortal.GUI.Pictures
                   {
                     thumbnailImage = Util.Utils.GetPicturesThumbPathname(item.Path);
                     thumbnailImageL = Util.Utils.GetPicturesLargeThumbPathname(item.Path);
-                  }
-                  else
-                  {
-                    thumbnailImage = Util.Utils.GetVideosThumbPathname(item.Path);
-                  }
 
-                  if (recreateThumbs || !File.Exists(thumbnailImage) || !Util.Utils.FileExistsInCache(thumbnailImage) ||
-                      !File.Exists(thumbnailImageL) || !Util.Utils.FileExistsInCache(thumbnailImageL))
-                  {
-                    Thread.Sleep(5);
-
-                    if (isPicture)
+                    if (recreateThumbs || !File.Exists(thumbnailImage) || !Util.Utils.FileExistsInCache(thumbnailImage) ||
+                        !File.Exists(thumbnailImageL) || !Util.Utils.FileExistsInCache(thumbnailImageL))
                     {
+                      Thread.Sleep(5);
+
                       iRotate = Util.Picture.GetRotateByExif(item.Path);
                       Log.Debug("Picture.GetRotateByExif = {0} for {1}", iRotate, item.Path);
 
                       if (autocreateLargeThumbs && !File.Exists(thumbnailImageL))
                       {
-                        thumbRet = Util.Picture.CreateThumbnail(item.Path, thumbnailImageL, (int) Thumbs.ThumbLargeResolution,
+                        thumbRet = Util.Picture.CreateThumbnail(item.Path, thumbnailImageL,
+                                                                (int) Thumbs.ThumbLargeResolution,
                                                                 (int) Thumbs.ThumbLargeResolution, iRotate,
                                                                 Thumbs.SpeedThumbsLarge,
                                                                 true, false);
@@ -164,10 +157,6 @@ namespace MediaPortal.GUI.Pictures
                                                                 false, false);
                       }
                     }
-                    else
-                    {
-                      thumbRet = Util.VideoThumbCreator.CreateVideoThumb(item.Path, thumbnailImage, true, true);
-                    }
 
                     if (thumbRet && autocreateLargeThumbs)
                     {
@@ -175,7 +164,6 @@ namespace MediaPortal.GUI.Pictures
                     }
                     else if (thumbRet)
                     {
-                      Thread.Sleep(5);
                       Log.Debug("GUIPictures: Creation of missing thumb successful for {0}", item.Path);
                     }
                   }
@@ -274,61 +262,43 @@ namespace MediaPortal.GUI.Pictures
         bool isPicture = Util.Utils.IsPicture(item);
         bool thumbRet = false;
 
-        if (isPicture || isVideo)
+        if (isPicture)
         {
           string thumbnailImage;
           string thumbnailImageL = null;
-
-          if (isPicture)
-          {
-            thumbnailImage = Util.Utils.GetPicturesThumbPathname(item);
-            thumbnailImageL = Util.Utils.GetPicturesLargeThumbPathname(item);
-          }
-          else
-          {
-            thumbnailImage = Util.Utils.GetVideosThumbPathname(item);
-          }
+          thumbnailImage = Util.Utils.GetPicturesThumbPathname(item);
+          thumbnailImageL = Util.Utils.GetPicturesLargeThumbPathname(item);
 
           if (recreateThumbs || !File.Exists(thumbnailImage) || !Util.Utils.FileExistsInCache(thumbnailImage) ||
               !File.Exists(thumbnailImageL) || !Util.Utils.FileExistsInCache(thumbnailImageL))
           {
 
-            if (isPicture)
-            {
-              iRotate = Util.Picture.GetRotateByExif(item);
-              Log.Debug("Picture.GetRotateByExif = {0} for {1}", iRotate, item); // Test SEB
-              Thread.Sleep(5);
+            iRotate = Util.Picture.GetRotateByExif(item);
+            Log.Debug("Picture.GetRotateByExif = {0} for {1}", iRotate, item);
+            Thread.Sleep(5);
 
-              if (autocreateLargeThumbs && !File.Exists(thumbnailImageL))
-              {
-                thumbRet = Util.Picture.CreateThumbnail(item, thumbnailImageL, (int) Thumbs.ThumbLargeResolution,
-                                                        (int) Thumbs.ThumbLargeResolution, iRotate,
-                                                        Thumbs.SpeedThumbsLarge,
-                                                        true, false);
-              }
-              if (!File.Exists(thumbnailImage))
-              {
-                thumbRet = Util.Picture.CreateThumbnail(item, thumbnailImage, (int) Thumbs.ThumbResolution,
-                                                        (int) Thumbs.ThumbResolution, iRotate,
-                                                        Thumbs.SpeedThumbsSmall,
-                                                        false, false);
-              }
-            }
-            else
+            if (autocreateLargeThumbs && !File.Exists(thumbnailImageL))
             {
-              thumbRet = Util.VideoThumbCreator.CreateVideoThumb(item, thumbnailImage, true, true);
+              thumbRet = Util.Picture.CreateThumbnail(item, thumbnailImageL, (int) Thumbs.ThumbLargeResolution,
+                                                      (int) Thumbs.ThumbLargeResolution, iRotate,
+                                                      Thumbs.SpeedThumbsLarge,
+                                                      true, false);
+            }
+            if (!File.Exists(thumbnailImage))
+            {
+              thumbRet = Util.Picture.CreateThumbnail(item, thumbnailImage, (int) Thumbs.ThumbResolution,
+                                                      (int) Thumbs.ThumbResolution, iRotate,
+                                                      Thumbs.SpeedThumbsSmall,
+                                                      false, false);
             }
 
             if (thumbRet && autocreateLargeThumbs)
             {
               Log.Debug("GUIPictures: Creation of missing large thumb successful for {0}", item);
-              Util.Utils.SetThumbnails(ref itemObject);
             }
             else if (thumbRet)
             {
-              Thread.Sleep(5);
               Log.Debug("GUIPictures: Creation of missing thumb successful for {0}", item);
-              Util.Utils.SetThumbnails(ref itemObject);
             }
           }
         }
@@ -1409,7 +1379,10 @@ namespace MediaPortal.GUI.Pictures
       if (!item.IsFolder)
       {
         string thumbnailImage = GetThumbnail(item.Path);
-        item.IconImage = thumbnailImage;
+        if (File.Exists(thumbnailImage) || Util.Utils.FileExistsInCache(thumbnailImage))
+        {
+          item.IconImage = thumbnailImage;
+        }
         if (_autocreateLargeThumbs)
         {
           string thumbnailLargeImage = GetLargeThumbnail(item.Path);
@@ -1444,7 +1417,10 @@ namespace MediaPortal.GUI.Pictures
       if (!item.IsFolder)
       {
         string thumbnailImage = GetThumbnail(item.Path);
-        item.IconImage = thumbnailImage;
+        if (File.Exists(thumbnailImage) || Util.Utils.FileExistsInCache(thumbnailImage))
+        {
+          item.IconImage = thumbnailImage;
+        }
         if (_autocreateLargeThumbs)
         {
           string thumbnailLargeImage = GetLargeThumbnail(item.Path);

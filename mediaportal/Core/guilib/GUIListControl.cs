@@ -365,10 +365,11 @@ namespace MediaPortal.GUI.Library
       GUIGraphicsContext.ScalePosToScreenResolution(ref _imageWidth, ref _imageHeight);
     }
 
-    private void item_OnThumbnailRefresh(GUIListItem item, bool gotFocus)
+    private void item_OnThumbnailRefresh(int buttonNr , bool gotFocus)
     {
       lock (GUIGraphicsContext.RenderLock)
       {
+        GUIListItem item = _listItems[buttonNr + _offset];
         // Update current focused thumbnail
         {
           if ((File.Exists(item.ThumbnailImage) || MediaPortal.Util.Utils.FileExistsInCache(item.ThumbnailImage)) && (item.Selected || gotFocus))
@@ -376,6 +377,7 @@ namespace MediaPortal.GUI.Library
             string selectedThumbProperty = GUIPropertyManager.GetProperty("#selectedthumb");
             if (selectedThumbProperty != item.ThumbnailImage)
             {
+              item.IconImage = item.ThumbnailImage;
               GUIPropertyManager.SetProperty("#selectedthumb", string.Empty);
               GUIPropertyManager.SetProperty("#selectedthumb", item.ThumbnailImage);
               OnSelectionChanged();
@@ -544,6 +546,10 @@ namespace MediaPortal.GUI.Library
 
       if (pItem.HasIcon)
       {
+        if ((File.Exists(pItem.ThumbnailImage) || MediaPortal.Util.Utils.FileExistsInCache(pItem.ThumbnailImage)))
+        {
+          pItem.IconImage = pItem.ThumbnailImage;
+        }
         // show icon
         GUIImage pImage = pItem.Icon;
         if (null == pImage)
@@ -1142,6 +1148,7 @@ namespace MediaPortal.GUI.Library
           // render item
           bool gotFocus = _drawFocus && i == _cursorX && IsFocused && _listType == ListType.CONTROL_LIST;
           RenderButton(timePassed, i, _positionX, dwPosY, gotFocus);
+          item_OnThumbnailRefresh(i, gotFocus);
         }
         dwPosY += _itemHeight + _spaceBetweenItems;
       }
@@ -1187,7 +1194,7 @@ namespace MediaPortal.GUI.Library
 
           RenderPinIcon(timePassed, i, pinX, dwPosY, gotFocus);
 
-          item_OnThumbnailRefresh(_listItems[i], gotFocus);
+          item_OnThumbnailRefresh(i, gotFocus);
 
           dwPosY += _itemHeight + _spaceBetweenItems;
         }

@@ -309,24 +309,28 @@ namespace MediaPortal.GUI.Library
       try
       {
         int width, height;
-        Texture dxtexture = LoadGraphic(fileName, lColorKey, iMaxWidth, iMaxHeight, out width, out height);
-        if (dxtexture != null)
-        {
-          CachedTexture newCache = new CachedTexture();
-          newCache.Name = fileName;
-          newCache.Frames = 1;
-          newCache.Width = width;
-          newCache.Height = height;
-          newCache.texture = new CachedTexture.Frame(fileName, dxtexture, 0);
-          //Log.Info("  texturemanager:added:" + fileName + " total:" + _cache.Count + " mem left:" + GUIGraphicsContext.DX9Device.AvailableTextureMemory.ToString());
-          newCache.Disposed += new EventHandler(cachedTexture_Disposed);
-          if (persistent && !_persistentTextures.ContainsKey(cacheKey))
-          {
-            _persistentTextures[cacheKey] = true;
-          }
 
-          _cacheTextures[cacheKey] = newCache;
-          return 1;
+        if (File.Exists(fileName) || MediaPortal.Util.Utils.FileExistsInCache(fileName))
+        {
+          Texture dxtexture = LoadGraphic(fileName, lColorKey, iMaxWidth, iMaxHeight, out width, out height);
+          if (dxtexture != null)
+          {
+            CachedTexture newCache = new CachedTexture();
+            newCache.Name = fileName;
+            newCache.Frames = 1;
+            newCache.Width = width;
+            newCache.Height = height;
+            newCache.texture = new CachedTexture.Frame(fileName, dxtexture, 0);
+            //Log.Info("  texturemanager:added:" + fileName + " total:" + _cache.Count + " mem left:" + GUIGraphicsContext.DX9Device.AvailableTextureMemory.ToString());
+            newCache.Disposed += new EventHandler(cachedTexture_Disposed);
+            if (persistent && !_persistentTextures.ContainsKey(cacheKey))
+            {
+              _persistentTextures[cacheKey] = true;
+            }
+
+            _cacheTextures[cacheKey] = newCache;
+            return 1;
+          }
         }
       }
       catch (Exception)

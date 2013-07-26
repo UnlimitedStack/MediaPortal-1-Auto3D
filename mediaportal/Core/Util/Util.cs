@@ -897,6 +897,7 @@ namespace MediaPortal.Util
 
     public static void GetVideoThumb(object i)
     {
+      Thread.CurrentThread.Name = "GetVideoThumb Thumbnail";
       GUIListItem item = (GUIListItem)i;
       string path = item.Path;
       string strThumb = Util.Utils.GetVideosThumbPathname(path);
