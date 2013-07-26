@@ -310,7 +310,7 @@ namespace MediaPortal.GUI.Library
       {
         int width, height;
 
-        if (File.Exists(fileName) || MediaPortal.Util.Utils.FileExistsInCache(fileName))
+        if (MediaPortal.Util.Utils.FileExistsInCache(fileName))
         {
           Texture dxtexture = LoadGraphic(fileName, lColorKey, iMaxWidth, iMaxHeight, out width, out height);
           if (dxtexture != null)
@@ -723,7 +723,7 @@ namespace MediaPortal.GUI.Library
     {
       lock (GUIGraphicsContext.RenderLock)
       {
-        if (string.IsNullOrEmpty(fileName) || !File.Exists(fileName))
+        if (string.IsNullOrEmpty(fileName) || !MediaPortal.Util.Utils.FileExistsInCache(fileName))
         {
           return;
         }
@@ -790,7 +790,7 @@ namespace MediaPortal.GUI.Library
 
     public static bool IsTemporary(string fileName)
     {
-      if (String.IsNullOrEmpty(fileName) || !File.Exists(fileName))
+      if (String.IsNullOrEmpty(fileName) || !MediaPortal.Util.Utils.FileExistsInCache(fileName))
       {
         return false;
       }

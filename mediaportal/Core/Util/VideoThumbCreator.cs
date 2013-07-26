@@ -158,6 +158,11 @@ namespace MediaPortal.Util
         preGapSec = Duration - 240;
       }
 
+      if (preGapSec < 0)
+      {
+        preGapSec = 4;
+      }
+
       TimeBetweenThumbs = (Duration - preGapSec) / 4;
 
       Log.Debug("{0} duration is {1}.", aVideoPath, Duration);
@@ -238,8 +243,8 @@ namespace MediaPortal.Util
             if (!Success)
             {
               Log.Info("VideoThumbCreator: {0} has not been executed successfully with arguments: {1}", ExtractApp, ExtractorFallbackArgs);
-              /*Utils.KillProcess(Path.ChangeExtension(ExtractApp, null));
-              return false;*/
+                /*Utils.KillProcess(Path.ChangeExtension(ExtractApp, null));
+                return false;*/
             }
           }
           // give the system a few IO cycles
@@ -266,23 +271,25 @@ namespace MediaPortal.Util
           }
         }
 
-        if (!LeaveShareThumb)
+        if (LeaveShareThumb)
         {
-          try
+          if (Utils.FileExistsInCache(aThumbPath))
           {
-            File.Delete(ShareThumbTemp);
-            Thread.Sleep(30);
+            try
+            {
+              string aThumbPathLarge = Utils.ConvertToLargeCoverArt(aThumbPath);
+              if (Utils.FileExistsInCache(aThumbPathLarge))
+              {
+                aThumbPath = aThumbPathLarge;
+              }
+              File.Copy(aThumbPath, ShareThumb);
+              File.SetAttributes(ShareThumb, File.GetAttributes(ShareThumb) & ~FileAttributes.Hidden);
+            }
+            catch (Exception)
+            {
+              Log.Debug("TvThumbnails.VideoThumbCreator: Exception on File.Copy({0}, {1})", ShareThumbTemp, ShareThumb);
+            }
           }
-          catch (Exception) { }
-        }
-        else if (!File.Exists(ShareThumb))
-        {
-          try
-          {
-            File.Move(ShareThumbTemp, ShareThumb);
-            File.SetAttributes(ShareThumb, File.GetAttributes(ShareThumb) & ~FileAttributes.Hidden);
-          }
-          catch (Exception) { }
         }
 
         // Remove left over files if needed

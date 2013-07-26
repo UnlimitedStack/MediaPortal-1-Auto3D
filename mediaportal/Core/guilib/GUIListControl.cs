@@ -372,7 +372,7 @@ namespace MediaPortal.GUI.Library
         GUIListItem item = _listItems[buttonNr + _offset];
         // Update current focused thumbnail
         {
-          if ((File.Exists(item.ThumbnailImage) || MediaPortal.Util.Utils.FileExistsInCache(item.ThumbnailImage)) && (item.Selected || gotFocus))
+          if (MediaPortal.Util.Utils.FileExistsInCache(item.ThumbnailImage) && (item.Selected || gotFocus))
           {
             string selectedThumbProperty = GUIPropertyManager.GetProperty("#selectedthumb");
             if (selectedThumbProperty != item.ThumbnailImage)
@@ -416,7 +416,7 @@ namespace MediaPortal.GUI.Library
       {
         GUIPropertyManager.SetProperty("#selecteditem", strSelected);
         GUIPropertyManager.SetProperty("#selecteditem2", strSelected2);
-        if (File.Exists(strThumb))
+        if (MediaPortal.Util.Utils.FileExistsInCache(strThumb))
         {
           GUIPropertyManager.SetProperty("#selectedthumb", strThumb);
         }
@@ -546,7 +546,7 @@ namespace MediaPortal.GUI.Library
 
       if (pItem.HasIcon)
       {
-        if ((File.Exists(pItem.ThumbnailImage) || MediaPortal.Util.Utils.FileExistsInCache(pItem.ThumbnailImage)))
+        if (MediaPortal.Util.Utils.FileExistsInCache(pItem.ThumbnailImage))
         {
           pItem.IconImage = pItem.ThumbnailImage;
         }
