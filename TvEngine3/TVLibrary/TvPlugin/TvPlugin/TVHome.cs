@@ -99,7 +99,7 @@ namespace TvPlugin
     private Channel _resumeChannel = null;
     private Thread heartBeatTransmitterThread = null;
     private static DateTime _updateProgressTimer = DateTime.MinValue;
-    private static ChannelNavigator m_navigator;
+    public static ChannelNavigator m_navigator;
     private static TVUtil _util;
     private static VirtualCard _card = null;
     private static DateTime _updateTimer = DateTime.Now;
@@ -107,7 +107,7 @@ namespace TvPlugin
     private static int _waitonresume = 0;
     public static bool settingsLoaded = false;
     private TvCropManager _cropManager = new TvCropManager();
-    private TvNotifyManager _notifyManager = new TvNotifyManager();
+    private static TvNotifyManager _notifyManager = new TvNotifyManager();
     private static List<string> _preferredLanguages;
     private static bool _usertsp;
     private static string _recordingpath = "";
@@ -119,7 +119,7 @@ namespace TvPlugin
     private static bool _showlastactivemodule = false;
     private static bool _showlastactivemoduleFullscreen = false;
     private static bool _playbackStopped = false;
-    private static bool _onPageLoadDone = false;
+    public static bool _onPageLoadDone = false;
     private static bool _userChannelChanged = false;
     private static bool _showChannelStateIcons = true;
     private static bool _doingHandleServerNotConnected = false;
@@ -129,6 +129,7 @@ namespace TvPlugin
     private static bool _connected = false;
     private static bool _isAnyCardRecording = false;
     protected static TvServer _server;
+    public static bool firstNotLoaded = true;
 
     private static ManualResetEvent _waitForBlackScreen = null;
     private static ManualResetEvent _waitForVideoReceived = null;
@@ -274,6 +275,44 @@ namespace TvPlugin
       return Load(GUIGraphicsContext.Skin + @"\mytvhomeServer.xml");
     }
 
+    public static void OnLoaded()
+    {
+      Log.Info("TVHome:OnLoaded");
+
+      try
+      {
+        if (Connected && !firstNotLoaded)
+        {
+          m_navigator = new ChannelNavigator();
+          m_navigator.OnZapChannel -= new ChannelNavigator.OnZapChannelDelegate(ForceUpdates);
+          m_navigator.OnZapChannel += new ChannelNavigator.OnZapChannelDelegate(ForceUpdates);
+          LoadSettings(true);
+
+          string pluginVersion = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).ProductVersion;
+          string tvServerVersion = Connected ? RemoteControl.Instance.GetAssemblyVersion : "Unknown";
+
+          if (Connected && pluginVersion != tvServerVersion)
+          {
+            string strLine = "TvPlugin and TvServer don't have the same version.\r\n";
+            strLine += "TvServer Version: " + tvServerVersion + "\r\n";
+            strLine += "TvPlugin Version: " + pluginVersion;
+            Log.Error(strLine);
+          }
+          else
+            Log.Info("TVHome V" + pluginVersion + ":ctor");
+        }
+      }
+      catch (Exception ex)
+      {
+        Log.Error("TVHome: Error occured in on loading : {0}, st {1}", ex.Message, Environment.StackTrace);
+      }
+
+      if (!firstNotLoaded)
+      {
+        _notifyManager.Start();
+      }
+    }
+
     public override void OnAdded()
     {
       Log.Info("TVHome:OnAdded");
@@ -294,9 +333,6 @@ namespace TvPlugin
       g_Player.AudioTracksReady += new g_Player.AudioTracksReadyHandler(OnAudioTracksReady);
 
       GUIWindowManager.Receivers += new SendMessageHandler(OnGlobalMessage);
-
-      // replace g_player's ShowFullScreenWindowTV
-      g_Player.ShowFullScreenWindowTV = ShowFullScreenWindowTVHandler;
 
       // Delete tv thumbs from local thumbs folder and file existence cache
       Log.Debug("TVHome.OnAdded: Delete thumb files in {0}", Thumbs.TVRecorded);
@@ -332,31 +368,13 @@ namespace TvPlugin
 
         TVHome.OnChannelChanged -= new OnChannelChangedDelegate(ForceUpdates);
         TVHome.OnChannelChanged += new OnChannelChangedDelegate(ForceUpdates);
-
-        m_navigator = new ChannelNavigator();
-        m_navigator.OnZapChannel -= new ChannelNavigator.OnZapChannelDelegate(ForceUpdates);
-        m_navigator.OnZapChannel += new ChannelNavigator.OnZapChannelDelegate(ForceUpdates);
-        LoadSettings();
-
-        string pluginVersion = FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).ProductVersion;
-        string tvServerVersion = Connected ? RemoteControl.Instance.GetAssemblyVersion : "Unknown";
-
-        if (Connected && pluginVersion != tvServerVersion)
-        {
-          string strLine = "TvPlugin and TvServer don't have the same version.\r\n";
-          strLine += "TvServer Version: " + tvServerVersion + "\r\n";
-          strLine += "TvPlugin Version: " + pluginVersion;
-          Log.Error(strLine);
-        }
-        else
-          Log.Info("TVHome V" + pluginVersion + ":ctor");
       }
       catch (Exception ex)
       {
         Log.Error("TVHome: Error occured in Init(): {0}, st {1}", ex.Message, Environment.StackTrace);
       }
 
-      _notifyManager.Start();
+      OnLoaded();
     }
 
 
@@ -459,19 +477,12 @@ namespace TvPlugin
 
       if (!Connected)
       {
-        if (!_onPageLoadDone)
-        {
-          RemoteControl.Clear();
-          GUIWindowManager.ActivateWindow((int)Window.WINDOW_SETTINGS_TVENGINE);
-          return;
-        }
-        else
-        {
-          UpdateStateOfRecButton();
-          UpdateProgressPercentageBar();
-          UpdateRecordingIndicator();
-          return;
-        }
+        RemoteControl.Clear();
+        GUIWindowManager.ActivateWindow((int)Window.WINDOW_SETTINGS_TVENGINE);
+        UpdateStateOfRecButton();
+        UpdateProgressPercentageBar();
+        UpdateRecordingIndicator();
+        return;
       }
 
       try
@@ -491,6 +502,7 @@ namespace TvPlugin
       if (!_onPageLoadDone && m_navigator != null)
       {
         m_navigator.ReLoad();
+        LoadSettings(false);
       }
 
       if (m_navigator == null)
@@ -556,7 +568,7 @@ namespace TvPlugin
 
     private void AutoTurnOnTv(Channel channel)
     {
-      if (_autoTurnOnTv && !_playbackStopped && !wasPrevWinTVplugin())
+      if (_autoTurnOnTv && !_playbackStopped)
       {
         if (!wasPrevWinTVplugin())
         {
@@ -680,7 +692,7 @@ namespace TvPlugin
         }
 
         // turn tv on/off        
-        if (Navigator.Channel.IsTv)
+        if (Navigator.Channel != null && Navigator.Channel.IsTv)
         {
           ViewChannelAndCheck(Navigator.Channel);
         }
@@ -843,7 +855,7 @@ namespace TvPlugin
     {
       if (!settingsLoaded)
       {
-        LoadSettings();
+        LoadSettings(false);
       }
       return _usertsp;
     }
@@ -896,20 +908,33 @@ namespace TvPlugin
       }
 
       _ServerNotConnectedHandled = true;
-      GUIDialogOK pDlgOK = (GUIDialogOK)GUIWindowManager.GetWindow((int)Window.WINDOW_DIALOG_OK);
+      GUIDialogNotify pDlgOK = (GUIDialogNotify) GUIWindowManager.GetWindow((int) Window.WINDOW_DIALOG_NOTIFY);
 
-      pDlgOK.Reset();
-      pDlgOK.SetHeading(257); //error
-      if (Navigator != null && Navigator.CurrentChannel != null && g_Player.IsTV)
+      if (pDlgOK == null)
       {
-        pDlgOK.SetLine(1, Navigator.CurrentChannel);
+        return;
       }
-      else
+
+      try
       {
-        pDlgOK.SetLine(1, "");
+        pDlgOK.Reset();
+        pDlgOK.SetHeading(257); //error
+        if (Navigator != null && Navigator.CurrentChannel != null && g_Player.IsTV)
+        {
+          pDlgOK.SetText(Navigator.CurrentChannel);
+        }
+        else
+        {
+          pDlgOK.SetText("");
+        }
+        pDlgOK.SetText(GUILocalizeStrings.Get(1510)); //Connection to TV server lost
+        pDlgOK.TimeOut = 5;
+        pDlgOK.DoModal(GUIWindowManager.ActiveWindow);
       }
-      pDlgOK.SetLine(2, GUILocalizeStrings.Get(1510)); //Connection to TV server lost
-      pDlgOK.DoModal(GUIWindowManager.ActiveWindow);
+      catch (Exception)
+      {
+        // Catch null message, can happen when closing MP
+      }
     }
 
     public static void ShowDlgThread()
@@ -1122,9 +1147,9 @@ namespace TvPlugin
 
     #region Serialisation
 
-    private static void LoadSettings()
+    public static void LoadSettings(bool force)
     {
-      if (settingsLoaded)
+      if (settingsLoaded && !force)
       {
         return;
       }
@@ -1361,9 +1386,14 @@ namespace TvPlugin
       {
         _recoverTV = false;
         GUIMessage initMsg = null;
-        initMsg = new GUIMessage(GUIMessage.MessageType.GUI_MSG_WINDOW_INIT, (int)Window.WINDOW_TV_OVERLAY, 0, 0, 0, 0,
+        initMsg = new GUIMessage(GUIMessage.MessageType.GUI_MSG_WINDOW_INIT, (int) Window.WINDOW_TV_OVERLAY, 0, 0, 0, 0,
                                  null);
         GUIWindowManager.SendThreadMessage(initMsg);
+      }
+      if (firstNotLoaded)
+      {
+        firstNotLoaded = false;
+        OnLoaded();
       }
     }
 
@@ -1392,6 +1422,7 @@ namespace TvPlugin
 
     private void HeartBeatTransmitter()
     {
+      RemoteControl.Clear();
       int countToHBLoop = 5;
 
       while (true)
@@ -1615,6 +1646,13 @@ namespace TvPlugin
 
     private void OnSuspend()
     {
+      // OnSuspend already in progress
+      if (_suspended)
+      {
+        Log.Info("TVHome: Suspend is already in progress");
+        return;
+      }
+
       Log.Debug("TVHome.OnSuspend()");
 
       RemoteControl.OnRemotingDisconnected -=
@@ -1643,6 +1681,12 @@ namespace TvPlugin
 
     private void OnResume()
     {
+      if (!_suspended)
+      {
+        Log.Info("TVHome: Resuming is already in progress");
+        return;
+      }
+
       Log.Debug("TVHome.OnResume()");
       try
       {
@@ -1684,25 +1728,59 @@ namespace TvPlugin
         switch (msg.WParam.ToInt32())
         {
           case PBT_APMSTANDBY:
-            Log.Info("TVHome.WndProc(): Windows is going to standby");
-            OnSuspend();
+            try
+            {
+              Log.Info("TVHome.WndProc(): Windows is going to standby");
+              OnSuspend();
+            }
+            catch (Exception ex)
+            {
+              Log.Error("TVHome.WndProc() PBT_APMSTANDBY: Exception {0}", ex.ToString());
+            }
             break;
           case PBT_APMSUSPEND:
-            Log.Info("TVHome.WndProc(): Windows is suspending");
-            OnSuspend();
+            try
+            {
+              Log.Info("TVHome.WndProc(): Windows is suspending");
+              OnSuspend();
+            }
+            catch (Exception ex)
+            {
+              Log.Error("TVHome.WndProc()PBT_APMSUSPEND: Exception {0}", ex.ToString());
+            }
             break;
           case PBT_APMQUERYSUSPEND:
           case PBT_APMQUERYSTANDBY:
+            try
+            {
             Log.Info("TVHome.WndProc(): Windows is going into powerstate (hibernation/standby)");
-
+            }
+            catch (Exception ex)
+            {
+              Log.Error("TVHome.WndProc()PBT_APMQUERYSUSPEND or PBT_APMQUERYSTANDBY: Exception {0}", ex.ToString());
+            }
             break;
           case PBT_APMRESUMESUSPEND:
+            try
+            {
             Log.Info("TVHome.WndProc(): Windows has resumed from hibernate mode");
             OnResume();
+            }
+            catch (Exception ex)
+            {
+              Log.Error("TVHome.WndProc()PBT_APMRESUMESUSPEND: Exception {0}", ex.ToString());
+            }
             break;
           case PBT_APMRESUMESTANDBY:
+            try
+            {
             Log.Info("TVHome.WndProc(): Windows has resumed from standby mode");
             OnResume();
+            }
+            catch (Exception ex)
+            {
+              Log.Error("TVHome.WndProc()PBT_APMRESUMESTANDBY: Exception {0}", ex.ToString());
+            }
             break;
         }
       }
@@ -2083,63 +2161,6 @@ namespace TvPlugin
       GUIControl.HideControl(GetID, (int)Controls.LABEL_REC_INFO);
       GUIControl.HideControl(GetID, (int)Controls.IMG_REC_RECTANGLE);
       GUIControl.HideControl(GetID, (int)Controls.IMG_REC_CHANNEL);
-    }
-
-    /// <summary>
-    /// This function replaces g_player.ShowFullScreenWindowTV
-    /// </summary>
-    /// <returns></returns>
-    private static bool ShowFullScreenWindowTVHandler()
-    {
-      if ((g_Player.IsTV && Card.IsTimeShifting) || g_Player.IsTVRecording)
-      {
-        //push chapter and jumppoint information into the gui property manager
-        if (g_Player.IsTVRecording && g_Player.HasChapters)
-        {
-          double[] chapters = g_Player.Chapters;
-          double[] jumppoints = g_Player.JumpPoints;
-          
-          string strChapters = string.Empty;
-          string strJumpPoints = string.Empty;
-          
-          double duration = g_Player.Duration;
-          if (chapters != null)
-          {
-            foreach(double chapter in chapters)
-            {
-              double chapterPercent = chapter/duration*100.0d;
-              strChapters += String.Format("{0:0.00}", chapterPercent) + " ";
-            }
-          }
-          if (jumppoints != null)
-          {
-            foreach (double jump in jumppoints)
-            {
-              double jumpPercent = jump/duration*100.0d;
-              strJumpPoints += String.Format("{0:0.00}", jumpPercent) + " ";
-            }
-          }
-          GUIPropertyManager.SetProperty("#TV.Record.chapters", strChapters);
-          GUIPropertyManager.SetProperty("#TV.Record.jumppoints", strJumpPoints);
-          Log.Debug("TVHome.ShowFullScreenWindowTVHandler - setting chapters: " + strChapters);
-          Log.Debug("TVHome.ShowFUllScreenWindowTVHandler - setting jumppoints: " + strJumpPoints);
-        }
-        else
-        {
-          GUIPropertyManager.SetProperty("#TV.Record.chapters", string.Empty);
-          GUIPropertyManager.SetProperty("#TV.Record.jumppoints", string.Empty);
-        }
-        // watching TV
-        if (GUIWindowManager.ActiveWindow == (int)Window.WINDOW_TVFULLSCREEN)
-        {
-          return true;
-        }
-        Log.Info("TVHome: ShowFullScreenWindow switching to fullscreen tv");
-        GUIWindowManager.ActivateWindow((int)Window.WINDOW_TVFULLSCREEN);
-        GUIGraphicsContext.IsFullScreenVideo = true;
-        return true;
-      }
-      return g_Player.ShowFullScreenWindowTVDefault();
     }
 
     public static void UpdateTimeShift() { }
@@ -2627,9 +2648,6 @@ namespace TvPlugin
           percentLivePoint *= 100.0d;
           GUIPropertyManager.SetProperty("#TV.View.Percentage", percentLivePoint.ToString());
           GUIPropertyManager.SetProperty("#TV.Record.percent3", percentLivePoint.ToString());
-        
-          GUIPropertyManager.SetProperty("#TV.Record.chapters", string.Empty);
-          GUIPropertyManager.SetProperty("#TV.Record.jumppoints", string.Empty);
         }
       }
 
@@ -2661,8 +2679,6 @@ namespace TvPlugin
       GUIPropertyManager.SetProperty("#TV.Record.percent2", "0");
       GUIPropertyManager.SetProperty("#TV.Record.percent3", "0");
       GUIPropertyManager.SetProperty("#TV.View.remaining", String.Empty);
-      GUIPropertyManager.SetProperty("#TV.Record.chapters", string.Empty);
-      GUIPropertyManager.SetProperty("#TV.Record.jumppoints", string.Empty);
     }
 
     private static void UpdateNextEpgProperties(Channel ch)

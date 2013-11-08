@@ -241,6 +241,7 @@ namespace SetupTv.Sections
       numericUpDownThumbColumns.Value = Convert.ToInt32(layer.GetSetting("TVThumbnailsColumns", "1").Value);
       numericUpDownThumbRows.Value = Convert.ToInt32(layer.GetSetting("TVThumbnailsRows", "1").Value);
       trackBarQuality.Value = Convert.ToInt32(layer.GetSetting("TVThumbnailsQuality", "4").Value);
+      numericUpDownTimeOffset.Value = Convert.ToInt32(layer.GetSetting("TVThumbnailsTimeOffset", "0").Value);
     }
 
     private static decimal ValueSanityCheck(int value, int min, int max)
@@ -332,6 +333,11 @@ namespace SetupTv.Sections
       setting = layer.GetSetting("TVThumbnailsQuality", "4");
       setting.Value = trackBarQuality.Value.ToString();
       setting.Persist();
+
+      setting = layer.GetSetting("TVThumbnailsTimeOffset", "1");
+      setting.Value = numericUpDownTimeOffset.Value.ToString();
+      setting.Persist();
+           
     }
 
     #endregion
@@ -651,26 +657,56 @@ namespace SetupTv.Sections
         return;
       string drive = (string)comboBoxDrive.SelectedItem;
       ulong freeSpace = Utils.GetFreeDiskSpace(drive);
-      long totalSpace = Utils.GetDiskSize(drive);
+      ulong totalSpace = Utils.GetDiskSpace(drive);
 
       labelFreeDiskspace.Text = Utils.GetSize((long)freeSpace);
-      labelTotalDiskSpace.Text = Utils.GetSize(totalSpace);
+      labelTotalDiskSpace.Text = Utils.GetSize((long)totalSpace);
       if (labelTotalDiskSpace.Text == "0")
         labelTotalDiskSpace.Text = "Not available - WMI service not available";
+      
+      Setting setting;
+      
       if (save)
       {
         TvBusinessLayer layer = new TvBusinessLayer();
-        Setting setting = layer.GetSetting("freediskspace" + drive[0]);
+        
+        if (drive.StartsWith(@"\"))
+        {
+          setting = layer.GetSetting("freediskspace" + drive);
+        }
+        else
+        {
+          setting = layer.GetSetting("freediskspace" + drive[0]);
+        }
+
         if (mpNumericTextBoxDiskQuota.Value < 500)
           mpNumericTextBoxDiskQuota.Value = 500;
         long quota = mpNumericTextBoxDiskQuota.Value * 1024;
         setting.Value = quota.ToString();
         setting.Persist();
+
+        if (enableDiskQuota.Checked)
+        {
+          Log.Debug("SetupTV: Disk Quota for {0} is enabled and set to {1} MB", drive, (int)quota / 1024);
+        }
+        else
+        {
+          Log.Debug("SetupTV: Disk Quota for {0} is disabled", drive);
+        }
       }
       else
       {
         TvBusinessLayer layer = new TvBusinessLayer();
-        Setting setting = layer.GetSetting("freediskspace" + drive[0]);
+
+        if (drive.StartsWith(@"\"))
+        {
+          setting = layer.GetSetting("freediskspace" + drive);
+        }
+        else
+        {
+          setting = layer.GetSetting("freediskspace" + drive[0]);
+        }
+
         try
         {
           long quota = Int64.Parse(setting.Value);
@@ -724,7 +760,15 @@ namespace SetupTv.Sections
         if (card.RecordingFolder.Length > 0)
         {
           string driveLetter = String.Format("{0}:", card.RecordingFolder[0]);
-          if (Utils.getDriveType(driveLetter) == 3)
+          
+          if (card.RecordingFolder.StartsWith(@"\"))
+          {
+            if (!comboBoxDrive.Items.Contains(driveLetter))
+            {
+              comboBoxDrive.Items.Add(card.RecordingFolder);
+            }
+          }
+          else if (Utils.getDriveType(driveLetter) == 3)
           {
             if (!comboBoxDrive.Items.Contains(driveLetter))
             {

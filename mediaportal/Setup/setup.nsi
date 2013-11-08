@@ -48,6 +48,8 @@
 !define git_InstallScripts "${git_ROOT}\Tools\InstallationScripts"
 # common script init
 !include "${git_InstallScripts}\include\MediaPortalScriptInit.nsh"
+# NET4.0 Checking
+!include "${git_InstallScripts}\include\DotNetSearch.nsh"
 
 # additional path definitions
 !ifdef GIT_BUILD
@@ -422,6 +424,7 @@ Section "MediaPortal core files (required)" SecCore
   
   SetOutPath "$MPdir.Config\scripts"
   File /nonfatal "${MEDIAPORTAL.BASE}\scripts\InternalActorMoviesGrabber.csscript"
+	File /nonfatal "${MEDIAPORTAL.BASE}\scripts\InternalMovieImagesGrabber.csscript"
   File /nonfatal "${MEDIAPORTAL.BASE}\scripts\VDBParserStrings.xml"
   
   SetOutPath "$MPdir.Base"
@@ -451,6 +454,7 @@ Section "MediaPortal core files (required)" SecCore
   File "${git_MP}\MediaPortal.Support\bin\${BUILD_TYPE}\MediaPortal.Support.dll"
   ; Databases
   File "${git_MP}\databases\bin\${BUILD_TYPE}\Databases.dll"
+  File "${git_MP}\databases\bin\${BUILD_TYPE}\HtmlAgilityPack.dll"
   ; MusicShareWatcher
   File "${git_MP}\ProcessPlugins\MusicShareWatcher\MusicShareWatcher\bin\${BUILD_TYPE}\MusicShareWatcher.exe"
   File "${git_MP}\ProcessPlugins\MusicShareWatcher\MusicShareWatcherHelper\bin\${BUILD_TYPE}\MusicShareWatcherHelper.dll"
@@ -484,6 +488,7 @@ Section "MediaPortal core files (required)" SecCore
   File /oname=bluray.dll "${git_DirectShowFilters}\bin_Win32\libbluray\libbluray.dll"
   ; TvLibrary for Genre
   File "${git_TVServer}\TvLibrary.Interfaces\bin\${BUILD_TYPE}\TvLibrary.Interfaces.dll"
+  File "${git_MP}\LastFMLibrary\bin\${BUILD_TYPE}\LastFMLibrary.dll"
   ; MediaPortal.exe
   
   #---------------------------------------------------------------------------
@@ -566,7 +571,8 @@ SectionEnd
   ; Config Files
   Delete "$MPdir.Config\CaptureCardDefinitions.xml"
   Delete "$MPdir.Config\eHome Infrared Transceiver List XP.xml"
-  Delete "$MPdir.Config\keymap.xml"
+  ; Don't delete this file (needed for manual user input)
+  ;Delete "$MPdir.Config\keymap.xml"
   Delete "$MPdir.Config\wikipedia.xml"
 
   Delete "$MPdir.Config\Installer\cleanup.xml"
@@ -575,6 +581,7 @@ SectionEnd
   Delete "$MPdir.Config\scripts\MovieInfo\IMDB_MP13x.csscript"
   RMDir "$MPdir.Config\scripts\MovieInfo"
   Delete "$MPdir.Config\scripts\InternalActorMoviesGrabber.csscript"
+	Delete "$MPdir.Config\scripts\InternalMovieImagesGrabber.csscript"
   Delete "$MPdir.Config\scripts\VDBParserStrings.xml"
   RMDir "$MPdir.Config\scripts"
 
@@ -604,6 +611,7 @@ SectionEnd
   Delete "$MPdir.Base\MediaPortal.Support.dll"
   ; Databases
   Delete "$MPdir.Base\Databases.dll"
+  Delete "$MPdir.Base\\HtmlAgilityPack.dll"
   ; MusicShareWatcher
   Delete "$MPdir.Base\MusicShareWatcher.exe"
   Delete "$MPdir.Base\MusicShareWatcherHelper.dll"
@@ -905,6 +913,9 @@ FunctionEnd
 Function .onInit
   ${LOG_OPEN}
   ${LOG_TEXT} "DEBUG" "FUNCTION .onInit"
+
+  !insertmacro MediaPortalNetFrameworkCheck
+  !insertmacro MediaPortalNet4FrameworkCheck
 
   StrCpy $MPTray_Running 0
 

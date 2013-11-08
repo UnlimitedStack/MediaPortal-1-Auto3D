@@ -189,6 +189,17 @@ namespace MediaPortal.Player
       set { _currentDescription = value; }
     }
 
+    public static MediaType currentMedia
+    {
+      get { return _currentMedia; }
+      set { _currentMedia = value; }
+    }
+
+    public static string currentFilePlaying
+    {
+      get { return _currentFilePlaying; }
+      set { _currentFilePlaying = value; }
+    }
     #endregion
 
     #region Serialisation
@@ -477,7 +488,7 @@ namespace MediaPortal.Player
     }
 
     //called when current playing file is stopped
-    private static void OnChanged(string newFile)
+    public static void OnChanged(string newFile)
     {
       if (newFile == null || newFile.Length == 0)
       {
@@ -503,7 +514,7 @@ namespace MediaPortal.Player
     }
 
     //called when current playing file is stopped
-    private static void OnStopped()
+    public static void OnStopped()
     {
       //check if we're playing
       if (Playing && PlayBackStopped != null)
@@ -530,7 +541,7 @@ namespace MediaPortal.Player
     }
 
     //called when current playing file ends
-    private static void OnEnded()
+    public static void OnEnded()
     {
       //check if we're playing
       if (PlayBackEnded != null)
@@ -552,7 +563,7 @@ namespace MediaPortal.Player
     }
 
     //called when starting playing a file
-    private static void OnStarted()
+    public static void OnStarted()
     {
       //check if we're playing
       if (_player == null)
@@ -1418,32 +1429,36 @@ namespace MediaPortal.Player
               _BDInternalMenu = xmlreader.GetValueAsBool("bdplayer", "useInternalBDPlayer", true);
             }
             if (_BDInternalMenu && extension == ".bdmv")
+            {
               AskForRefresh = false;
+            }
             if (AskForRefresh)
             {
               // Refreshrate change done here. Blu-ray player will handle the refresh rate changes by itself
-              if (strFile.IndexOf(@"\BDMV\INDEX.BDMV") == -1)
+              // Identify if it's a video
+              if (strFile.IndexOf(@"\BDMV\INDEX.BDMV") == -1 && type != MediaType.Radio)
               {
-                RefreshRateChanger.AdaptRefreshRate(strFile, (RefreshRateChanger.MediaType) (int) type);
+                // Make a double check on .ts because it can be recorded TV or Radio
+                if (extension == ".ts")
+                {
+                  if (MediaInfo.hasVideo)
+                  {
+                    RefreshRateChanger.AdaptRefreshRate(strFile, (RefreshRateChanger.MediaType)(int)type);
+                  }
+                }
+                else
+                {
+                  RefreshRateChanger.AdaptRefreshRate(strFile, (RefreshRateChanger.MediaType)(int)type);
+                }
               }
             }
           }
 
-          if (RefreshRateChanger.RefreshRateChangePending)
+          if (RefreshRateChangePending())
           {
-            TimeSpan ts = DateTime.Now - RefreshRateChanger.RefreshRateChangeExecutionTime;
-            if (ts.TotalSeconds > RefreshRateChanger.WAIT_FOR_REFRESHRATE_RESET_MAX)
-            {
-              Log.Info(
-                "g_Player.Play - waited {0}s for refreshrate change, but it never took place (check your config). Proceeding with playback.",
-                RefreshRateChanger.WAIT_FOR_REFRESHRATE_RESET_MAX);
-              RefreshRateChanger.ResetRefreshRateState();
-            }
-            else
-            {
-              return true;
-            }
+            return true;
           }
+
           // Set bool to know if we want to use video codec for .ts files
           if (fromExtTS)
           {
@@ -1470,20 +1485,31 @@ namespace MediaPortal.Player
               bool bInternal = xmlreader.GetValueAsBool("movieplayer", "internal", true);
               bool bInternalDVD = xmlreader.GetValueAsBool("dvdplayer", "internal", true);
 
+              // check if we are running from Images / Discs
+              string pathRoot = Path.GetPathRoot(strFile);
+              if (Util.Utils.getDriveType(pathRoot) == 5 && !bInternalDVD)
+              {
+                bInternalDVD = false;
+              }
+              else
+              {
+                bInternalDVD = true;
+              }
+
               // External player extension filter
               _externalPlayerExtensions = xmlreader.GetValueAsString("movieplayer", "extensions", "");
               if (!bInternal && !string.IsNullOrEmpty(_externalPlayerExtensions) &&
-                  extension != ".ifo" && extension != ".vob" && !Util.Utils.IsDVDImage(strFile))
+                  extension != ".ifo" && extension != ".vob" && extension != ".bdmv" && !Util.Utils.IsDVDImage(strFile))
               {
                 // Do not use external player if file ext is not in the extension list
                 if (!CheckExtension(strFile))
                   bInternal = true;
               }
 
-              if ((!bInternalDVD && !isImageFile && (extension == ".ifo" || extension == ".vob")) ||
+              if ((!bInternalDVD && !isImageFile && (extension == ".ifo" || extension == ".vob" || extension == ".bdmv")) ||
                   (!bInternalDVD && isImageFile && Util.Utils.IsDVDImage(strFile)) ||
                   // No image and no DVD folder rips
-                  (!bInternal && !isImageFile && extension != ".ifo" && extension != ".vob") ||
+                  (!bInternal && !isImageFile && extension != ".ifo" && extension != ".vob" && extension != ".bdmv") ||
                   // BluRay image
                   (!bInternal && isImageFile && Util.Utils.IsBDImage(strFile))) // external player used
               {
@@ -1499,6 +1525,14 @@ namespace MediaPortal.Player
                       return false;
                   }
                 }
+                // Do refresh rate
+                RefreshRateChanger.AdaptRefreshRate(strFile, (RefreshRateChanger.MediaType)(int)type);
+
+                if (RefreshRateChangePending())
+                {
+                  return true;
+                }
+
                 if (Util.Utils.PlayMovie(strFile))
                 {
                   return true;
@@ -1576,6 +1610,26 @@ namespace MediaPortal.Player
         Starting = false;
       }
       UnableToPlay(strFile, type);
+      return false;
+    }
+
+    private static bool RefreshRateChangePending()
+    {
+      if (RefreshRateChanger.RefreshRateChangePending)
+      {
+        TimeSpan ts = DateTime.Now - RefreshRateChanger.RefreshRateChangeExecutionTime;
+        if (ts.TotalSeconds > RefreshRateChanger.WAIT_FOR_REFRESHRATE_RESET_MAX)
+        {
+          Log.Info(
+            "g_Player.Play - waited {0}s for refreshrate change, but it never took place (check your config). Proceeding with playback.",
+            RefreshRateChanger.WAIT_FOR_REFRESHRATE_RESET_MAX);
+          RefreshRateChanger.ResetRefreshRateState();
+        }
+        else
+        {
+          return true;
+        }
+      }
       return false;
     }
 
@@ -3435,7 +3489,7 @@ namespace MediaPortal.Player
 
     public static bool ShowFullScreenWindowVideoDefault()
     {
-      if (!HasVideo && !IsMusic)
+      if (!HasVideo && !IsMusic && !IsRadio)
       {
         return false;
       }
@@ -3452,6 +3506,7 @@ namespace MediaPortal.Player
         {
           if (GUIWindowManager.ActiveWindow == (int)GUIWindow.Window.WINDOW_MUSIC_PLAYING_NOW)
           {
+            GUIWindowManager.ShowPreviousWindow();
             return true;
           }
 
