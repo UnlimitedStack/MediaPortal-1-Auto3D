@@ -136,8 +136,6 @@ namespace MediaPortal.MusicPlayer.BASS
 
     private TAG_INFO _tagInfo;
 
-    private System.Windows.Forms.Timer _stoppedStreamsTimer = new System.Windows.Forms.Timer();
-
     #endregion
 
     #region Properties
@@ -647,7 +645,6 @@ namespace MediaPortal.MusicPlayer.BASS
             g_Player.OnStopped();
             Stop();
           }
-
           break;
 
         case MusicStream.StreamAction.InternetStreamChanged:
@@ -655,6 +652,12 @@ namespace MediaPortal.MusicPlayer.BASS
           if (InternetStreamSongChanged != null)
           {
             InternetStreamSongChanged(this);
+          }
+          break;
+
+        case MusicStream.StreamAction.Freed:
+          {
+            musicStream.Dispose();
           }
           break;
 
@@ -727,9 +730,6 @@ namespace MediaPortal.MusicPlayer.BASS
           _streamcopy = new StreamCopy();
           _streamcopy.StreamCopyFlags = BASSFlag.BASS_SAMPLE_FLOAT | BASSFlag.BASS_STREAM_DECODE;
         }
-
-        _stoppedStreamsTimer.Interval = 30000;        
-        _stoppedStreamsTimer.Tick += CleanupStoppedStreams;
 
         Log.Info("BASS: Initializing BASS environment done.");
 
@@ -1029,7 +1029,7 @@ namespace MediaPortal.MusicPlayer.BASS
       {
         case 0:
           return 1;
-        
+
         case 1:
           return 2;
 
@@ -1144,7 +1144,7 @@ namespace MediaPortal.MusicPlayer.BASS
 
     #endregion
 
-    #region Clenaup / Free Resources
+    #region Cleanup / Free Resources
 
     /// <summary>
     /// Dispose the BASS Audio engine. Free all BASS and Visualisation related resources
@@ -1239,25 +1239,9 @@ namespace MediaPortal.MusicPlayer.BASS
         VizWindow.Visible = false;
       }
 
-      //if (!Stopped) // Check if stopped already to avoid that Stop() is called two or three times
+      if (!Stopped) // Check if stopped already to avoid that Stop() is called two or three times
       {
         Stop();
-      }
-    }
-
-    /// <summary>
-    /// Cleanup of Stopped streams. Invoked by a Timer
-    /// </summary>
-    private void CleanupStoppedStreams(Object obj, EventArgs evtArgs)
-    {
-      for (var i = _streams.Count - 1; i >= 0; i--)
-      {
-        MusicStream stream = _streams[i];
-        if (!stream.IsPlaying)
-        {
-          Log.Debug("BASS: cleaning up stopped stream: {0}", stream.FilePath);
-          stream.Dispose();
-        }
       }
     }
 
@@ -1498,9 +1482,10 @@ namespace MediaPortal.MusicPlayer.BASS
           _currentCueSheet = null;
         }
       }
-      catch (Exception)
+      catch (System.IO.FileNotFoundException)
       {
-        // Catch exception to avoid crash.
+        // The CUE File may have been moved
+        Log.Error("BASS: Cue File cannot be found at the expected location. aborting playback.");
       }
       return false;
     }
@@ -1583,30 +1568,22 @@ namespace MediaPortal.MusicPlayer.BASS
       }
       else
       {
-        if (!_mixer.UpMixing)
+        if (NewMixerNeeded(stream))
         {
-          BASS_CHANNELINFO chinfo = Bass.BASS_ChannelGetInfo(_mixer.BassStream);
-          if (!_mixer.WasApiShared &&
-              (chinfo.freq != stream.ChannelInfo.freq || chinfo.chans != stream.ChannelInfo.chans))
+          Log.Debug("BASS: New stream has different number of channels or sample rate. Need a new mixer.");
+          // Free Mixer
+          _mixer.Dispose();
+          _mixer = null;
+          _mixer = new MixerStream(this);
+          if (!_mixer.CreateMixer(stream))
           {
-            if (stream.ChannelInfo.freq != _mixer.WasApiMixedFreq ||
-                stream.ChannelInfo.chans != _mixer.WasApiMixedChans)
-            {
-              Log.Debug("BASS: New stream has different number of channels or sample rate. Need a new mixer.");
-              _mixer.Dispose();
-              _mixer = null;
-              _mixer = new MixerStream(this);
-              if (!_mixer.CreateMixer(stream))
-              {
-                Log.Error("BASS: Could not create Mixer. Aborting playback.");
-                return false;
-              }
+            Log.Error("BASS: Could not create Mixer. Aborting playback.");
+            return false;
+          }
 
-              if (HasViz)
-              {
-                _streamcopy.ChannelHandle = _mixer.BassStream;
-              }
-            }
+          if (HasViz)
+          {
+            _streamcopy.ChannelHandle = _mixer.BassStream;
           }
         }
       }
@@ -1652,10 +1629,14 @@ namespace MediaPortal.MusicPlayer.BASS
         if (currentStream != null && filePath.ToLowerInvariant().CompareTo(currentStream.FilePath.ToLowerInvariant()) == 0)
         {
           // Selected file is equal to current stream
+          // Extend detection to permit to play the file if it failed.
+          if (_state == PlayState.Paused || _state == PlayState.Init)
+          {
           if (_state == PlayState.Paused)
           {
             // Resume paused stream
             currentStream.ResumePlayback();
+            }
 
             result = Bass.BASS_Start();
 
@@ -1684,9 +1665,12 @@ namespace MediaPortal.MusicPlayer.BASS
         else
         {
           // Cue support
-          if (HandleCueFile(ref filePath))
+          if ((currentStream != null && currentStream.IsPlaying))
           {
-            return true;
+            if (HandleCueFile(ref filePath))
+            {
+              return true;
+            }
           }
         }
 
@@ -1701,14 +1685,17 @@ namespace MediaPortal.MusicPlayer.BASS
 
         _state = PlayState.Init;
 
+        // If WASAPI is started, we might run into troubles, because of a new stream needed,
+        // So let's stop it here
+        if (Config.MusicPlayer == AudioPlayer.WasApi && BassWasapi.BASS_WASAPI_IsStarted())
+        {
+          Log.Debug("BASS: Stop WASAPI Device before start of new playback");
+          BassWasapi.BASS_WASAPI_Stop(true);
+        }
+
         if (!PlayInternal(filePath))
         {
           return false;
-        }
-
-        if (!_stoppedStreamsTimer.Enabled)
-        {
-          _stoppedStreamsTimer.Start();
         }
 
         if (Config.MusicPlayer == AudioPlayer.Asio && !BassAsio.BASS_ASIO_IsStarted())
@@ -1887,7 +1874,7 @@ namespace MediaPortal.MusicPlayer.BASS
       if (_mixer == null)
       {
         Log.Debug("BASS: Already stopped. Don't execute Stop a second time");
-        //return;
+        return;
       }
 
       // Execute the Stop in a separate thread, so that it doesn't block the Main UI Render thread
@@ -1909,6 +1896,11 @@ namespace MediaPortal.MusicPlayer.BASS
 
                              // Wait until the slide is done
                              // Sometimes the slide is causing troubles, so we wait a maximum of CrossfadeIntervals + 100 ms
+                             // Enable only if it's music playing
+                             if (g_Player.IsMusic && g_Player._currentMediaForBassEngine != g_Player.MediaType.Video &&
+                                 g_Player._currentMediaForBassEngine != g_Player.MediaType.TV &&
+                                 g_Player._currentMediaForBassEngine != g_Player.MediaType.Recording)
+                             {
                              DateTime start = DateTime.Now;
                              while (Bass.BASS_ChannelIsSliding(stream.BassStream, BASSAttribute.BASS_ATTRIB_VOL))
                              {
@@ -1919,7 +1911,7 @@ namespace MediaPortal.MusicPlayer.BASS
                                }
                              }
                            }
-
+                         }
                          }
                          BassMix.BASS_Mixer_ChannelRemove(stream.BassStream);
                          stream.Dispose();
@@ -2007,7 +1999,6 @@ namespace MediaPortal.MusicPlayer.BASS
                        Log.Error("BASS: Stop command caused an exception - {0}. {1}", ex.Message, ex.StackTrace);
                      }
 
-                     _stoppedStreamsTimer.Stop();
                      NotifyPlaying = false;
                    }
         ) { Name = "BASS Stop" }.Start();
@@ -2020,7 +2011,7 @@ namespace MediaPortal.MusicPlayer.BASS
     {
       PlayState oldState = _state;
 
-      if (!Util.Utils.IsAudio(_filePath))
+      if (!Util.Utils.IsAudio(_filePath) || g_Player._currentMediaForBassEngine == g_Player.MediaType.Video)
       {
         GUIGraphicsContext.IsFullScreenVideo = false;
       }
@@ -2405,6 +2396,30 @@ namespace MediaPortal.MusicPlayer.BASS
     #endregion
 
     #region  Public Methods
+
+    /// <summary>
+    /// Checks, if a new Mixer would be needed, because of changes in Sample Rate or number of channels
+    /// </summary>
+    /// <param name="stream"></param>
+    /// <returns></returns>
+    public bool NewMixerNeeded(MusicStream stream)
+    {
+      if (!_mixer.UpMixing)
+      {
+        BASS_CHANNELINFO chinfo = Bass.BASS_ChannelGetInfo(_mixer.BassStream);
+        if (!_mixer.WasApiShared &&
+            (chinfo.freq != stream.ChannelInfo.freq || (chinfo.chans != stream.ChannelInfo.chans && stream.ChannelInfo.chans != 1)))
+        {
+          if (stream.ChannelInfo.freq != _mixer.WasApiMixedFreq ||
+              stream.ChannelInfo.chans != _mixer.WasApiMixedChans)
+          {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    }
 
     /// <summary>
     /// Returns the Tags of an AV Stream
