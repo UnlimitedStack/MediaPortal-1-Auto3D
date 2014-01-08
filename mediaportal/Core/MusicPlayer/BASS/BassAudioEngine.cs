@@ -581,7 +581,7 @@ namespace MediaPortal.MusicPlayer.BASS
 
         case Action.ActionType.ACTION_PAGE_UP:
           {
-            if (FullScreen)
+            if (FullScreen && CurrentAudioStream != 0)
             {
               Log.Debug("BASS: Switch to Previous Vis");
               VizManager.GetPrevVis();
@@ -591,7 +591,7 @@ namespace MediaPortal.MusicPlayer.BASS
 
         case Action.ActionType.ACTION_PAGE_DOWN:
           {
-            if (FullScreen)
+            if (FullScreen && CurrentAudioStream != 0)
             {
               Log.Info("BASS: Switch to Next Vis");
               VizManager.GetNextVis();
@@ -633,10 +633,10 @@ namespace MediaPortal.MusicPlayer.BASS
           string nextSong = Playlists.PlayListPlayer.SingletonPlayer.GetNextSong();
           if (nextSong != string.Empty)
           {
+            g_Player.OnChanged(nextSong);
             PlayInternal(nextSong);
             g_Player.currentMedia = g_Player.MediaType.Music;
             g_Player.currentFilePlaying = nextSong;
-            g_Player.OnChanged(nextSong);
             g_Player.OnStarted();
           }
           else
@@ -1399,9 +1399,12 @@ namespace MediaPortal.MusicPlayer.BASS
       if (VizWindow.InvokeRequired)
       {
         ShowVisualizationWindowDelegate d = new ShowVisualizationWindowDelegate(ShowVisualizationWindow);
-        VizWindow.Invoke(d, new object[] { visible });
+        try
+        {
+          VizWindow.Invoke(d, new object[] { visible });
+        }
+        catch { }
       }
-
       else
       {
         VizWindow.Visible = visible;
@@ -1880,6 +1883,9 @@ namespace MediaPortal.MusicPlayer.BASS
       // Execute the Stop in a separate thread, so that it doesn't block the Main UI Render thread
       new Thread(() =>
                    {
+                     // First deactivate Viz RenderThread, in HandleSongEnded, it's too late
+                     VizWindow.Run = false;
+
                      MusicStream stream = GetCurrentStream();
                      try
                      {
@@ -2017,7 +2023,6 @@ namespace MediaPortal.MusicPlayer.BASS
       }
 
       ShowVisualizationWindow(false);
-      VizWindow.Run = false;
 
       GUIGraphicsContext.IsPlaying = false;
 
