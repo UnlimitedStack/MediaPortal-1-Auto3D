@@ -1000,13 +1000,13 @@ namespace MediaPortal.Player
 
                 case GUIGraphicsContext.eRender3DModeHalf.TABTop:
 
-                  _sourceRect.Y = originalSource.Y / 2;
+                  _sourceRect.Y = originalSource.Y;
                   _sourceRect.Height = originalSource.Height / 2;
                   break;
 
                 case GUIGraphicsContext.eRender3DModeHalf.TABBottom:
 
-                  _sourceRect.Y = originalSource.Height / 2 - originalSource.Y / 2;
+                  _sourceRect.Y = originalSource.Height / 2 + originalSource.Y * 2;
                   _sourceRect.Height = originalSource.Height / 2;
                   break;
               }
