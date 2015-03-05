@@ -99,6 +99,16 @@ namespace MediaPortal.GUI.Library
             GUIFontManager.Present();
           }
         }
+
+        if (i == (int)LayerType.TopOverlay)
+        {
+            if (_layers[videoLayer] == null || 
+                (_layers[videoLayer] != null && !GUIGraphicsContext.IsFullScreenVideo))
+            {
+                if (GUIGraphicsContext.ShowTestPattern)
+                    MediaPortal.Player.PlaneScene.DrawTestPattern();   
+            }
+        }
       }
     }
   }

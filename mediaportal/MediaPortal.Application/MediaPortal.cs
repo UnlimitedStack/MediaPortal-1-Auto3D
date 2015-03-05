@@ -4166,6 +4166,22 @@ public class MediaPortalApp : D3D, IRender
       _showStats = !_showStats;
     }
 
+    if (key.KeyChar == '\"')
+    {
+      GUIGraphicsContext.ShowTestPattern = !GUIGraphicsContext.ShowTestPattern;
+    }
+
+    if (key.KeyChar == '§')
+    {
+        if (GUIGraphicsContext.ShowTestPattern)
+        {
+            GUIGraphicsContext.TestPatternIndex++;
+
+            if (GUIGraphicsContext.TestPatternIndex > 1)
+                GUIGraphicsContext.TestPatternIndex = 0;
+        }
+    }
+
     if (key.KeyChar == '|' && g_Player.Playing == false)
     {
       g_Player.Play("rtsp://localhost/stream0");

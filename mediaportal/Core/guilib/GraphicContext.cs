@@ -188,6 +188,8 @@ namespace MediaPortal.GUI.Library
     {
       Render3DMode = eRender3DMode.None;
       Switch3DSides = false;
+      ShowTestPattern = false;
+      TestPatternIndex = 0;
     }
 
     /// <summary>
@@ -288,6 +290,8 @@ namespace MediaPortal.GUI.Library
       }
     }
 
+    public static bool ShowTestPattern { get; set; }
+    public static int TestPatternIndex { get; set; }
     public enum eRender3DModeHalf { None, SBSLeft, SBSRight, TABTop, TABBottom };
 
     public static eRender3DModeHalf Render3DModeHalf { get; set; }

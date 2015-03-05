@@ -86,6 +86,8 @@ namespace MediaPortal.Player
 
     private const int _full3DTABMinHeight = 720 * 2;
     private const int _full3DSBSMinWidth  = 1280 * 2;
+   
+    private static TestPattern _testPattern = null;
 
     private FrameGrabber grabber = FrameGrabber.GetInstance();
 
@@ -242,6 +244,11 @@ namespace MediaPortal.Player
 
       grabber.Clean();
       SubtitleRenderer.GetInstance().Clear();
+      if (_testPattern != null)
+      {
+          _testPattern.Dispose();
+          _testPattern = null;
+      }
     }
 
     /// <summary>
@@ -546,37 +553,66 @@ namespace MediaPortal.Player
       return 0;
     }
 
-    public static void RenderFor3DMode(GUIGraphicsContext.eRender3DModeHalf renderModeHalf, float timePassed,
-                                       Surface backbuffer, Surface surface, Rectangle targetRect)
+    public static void DrawTestPattern()
     {
-      GUIGraphicsContext.DX9Device.SetRenderTarget(0, surface);
+        Surface target = GUIGraphicsContext.DX9Device.GetRenderTarget(0);
+        DrawTestPattern(target, _sourceRect, new Rectangle(0, 0, target.Description.Width, target.Description.Height));
+        target.Dispose();
+    }
 
-      GUIGraphicsContext.DX9Device.Clear(ClearFlags.Target, Color.Black, 1.0f, 0);
+    public static void DrawTestPattern(Surface backbuffer, Rectangle sourceRect, Rectangle targetRect)
+    {
+        if (_testPattern == null)
+            _testPattern = new TestPattern();
 
-      GUIGraphicsContext.DX9Device.BeginScene();
-      GUIGraphicsContext.SetScalingResolution(0, 0, false);
+        if (GUIGraphicsContext.IsPlayingVideo && GUIGraphicsContext.IsFullScreenVideo)
+        {
+            _testPattern.UpdateAspectRatio(GUIGraphicsContext.VideoSize.Width, GUIGraphicsContext.VideoSize.Height, GUIGraphicsContext.TestPatternIndex);
+            _testPattern.Render(sourceRect, targetRect, backbuffer, _renderModeHalf);
+        }
+        else
+        {
+            _testPattern.UpdateAspectRatio(GUIGraphicsContext.Width, GUIGraphicsContext.Height, GUIGraphicsContext.TestPatternIndex);
+            _testPattern.Render(new Rectangle(0, 0, GUIGraphicsContext.Width, GUIGraphicsContext.Height), new Rectangle(0, 0, GUIGraphicsContext.Width, GUIGraphicsContext.Height), backbuffer, _renderModeHalf);
+        }
+    }
 
-      GUIGraphicsContext.Render3DModeHalf = renderModeHalf;
+    private static GUIGraphicsContext.eRender3DModeHalf _renderModeHalf;
 
-      try
-      {
+    public static void RenderFor3DMode(GUIGraphicsContext.eRender3DModeHalf renderModeHalf, float timePassed, Surface backbuffer, Surface surface, Rectangle targetRect)
+    {
+        _renderModeHalf = renderModeHalf;
+
+        GUIGraphicsContext.DX9Device.SetRenderTarget(0, surface);
+
+        GUIGraphicsContext.DX9Device.Clear(ClearFlags.Target, Color.Black, 1.0f, 0);
+
+        GUIGraphicsContext.DX9Device.BeginScene();
+        GUIGraphicsContext.SetScalingResolution(0, 0, false);
+
+        GUIGraphicsContext.Render3DModeHalf = renderModeHalf;
+
+        try
+        {
         if (!GUIGraphicsContext.BlankScreen)
         {
-          // Render GUI + Video surface
-          GUIGraphicsContext.RenderGUI.RenderFrame(timePassed);
-          GUIFontManager.Present();
+            // Render GUI + Video surface
+            GUIGraphicsContext.RenderGUI.RenderFrame(timePassed);
+            GUIFontManager.Present();
         }
-      }
-      finally
-      {
+        }
+        finally
+        {
         GUIGraphicsContext.DX9Device.EndScene();
-      }
+        }
 
-      GUIGraphicsContext.DX9Device.SetRenderTarget(0, backbuffer);
-      GUIGraphicsContext.DX9Device.StretchRectangle(surface,
+        GUIGraphicsContext.DX9Device.SetRenderTarget(0, backbuffer);
+
+       GUIGraphicsContext.DX9Device.StretchRectangle(surface,
                                                     new Rectangle(0, 0, backbuffer.Description.Width,
                                                                   backbuffer.Description.Height), backbuffer, targetRect,
                                                     TextureFilter.Point);
+        _renderModeHalf = GUIGraphicsContext.eRender3DModeHalf.None;
     }
 
     private void InternalPresentImage(int width, int height, int arWidth, int arHeight, bool isRepaint)
@@ -1034,7 +1070,8 @@ namespace MediaPortal.Player
               {
                 case GUIGraphicsContext.eRender3DModeHalf.SBSLeft:
 
-                  if (!GUIGraphicsContext.IsFullHD3DFormat)
+                  if (!GUIGraphicsContext.IsFullHD3DFormat &&
+                      !GUIGraphicsContext.ShowTestPattern) 
                   {
                     _sourceRect.X = originalSource.X / 2;
                     _sourceRect.Width = originalSource.Width / 2;
@@ -1049,8 +1086,11 @@ namespace MediaPortal.Player
                   }
                   else
                   {
-                    _sourceRect.X = _geometry.ImageWidth / 2 + originalSource.X / 2;
-                    _sourceRect.Width = originalSource.Width / 2;
+                      if (!GUIGraphicsContext.ShowTestPattern)
+                      {
+                          _sourceRect.X = _geometry.ImageWidth / 2 + originalSource.X / 2;
+                          _sourceRect.Width = originalSource.Width / 2;
+                      }
                   }
                   break;
 
@@ -1058,8 +1098,11 @@ namespace MediaPortal.Player
 
                   if (!GUIGraphicsContext.IsFullHD3DFormat)
                   {
-                    _sourceRect.Y = originalSource.Y;
-                    _sourceRect.Height = originalSource.Height / 2;
+                      if (!GUIGraphicsContext.ShowTestPattern)
+                      {
+                          _sourceRect.Y = originalSource.Y;
+                          _sourceRect.Height = originalSource.Height / 2;
+                      }
                   }
                   break;
 
@@ -1071,8 +1114,11 @@ namespace MediaPortal.Player
                   }
                   else
                   {
-                    _sourceRect.Y = _geometry.ImageHeight / 2 + originalSource.Y * 2;
-                    _sourceRect.Height = originalSource.Height / 2;
+                      if (!GUIGraphicsContext.ShowTestPattern)
+                      {
+                          _sourceRect.Y = _geometry.ImageHeight / 2 + originalSource.Y * 2;
+                          _sourceRect.Height = originalSource.Height / 2;
+                      }
                   }
                   break;
               }
@@ -1138,8 +1184,18 @@ namespace MediaPortal.Player
 
           DrawTexture(_textureAddress, _diffuseColor);
 
+          if (GUIGraphicsContext.ShowTestPattern)
+          {
+              Surface target = GUIGraphicsContext.DX9Device.GetRenderTarget(0);
+              DrawTestPattern(target, _sourceRect, _destinationRect);
+              target.Dispose();
+          }
+
           _sourceRect = originalSource;
           _destinationRect = originalDestination;
+
+          if (GUIGraphicsContext.ShowTestPattern)
+              return; // do not show subtitles over test pattern
         }
       }
       else
