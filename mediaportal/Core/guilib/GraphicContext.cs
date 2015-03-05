@@ -188,6 +188,9 @@ namespace MediaPortal.GUI.Library
     {
       Render3DMode = eRender3DMode.None;
       Switch3DSides = false;
+      Convert2Dto3DSkewFactor = 0;
+      LastFrames = new List<Texture>();
+      LastFramesIndex = 0;
     }
 
     /// <summary>
@@ -272,7 +275,7 @@ namespace MediaPortal.GUI.Library
 
     public static object RenderModeSwitch = new Object();
 
-    public enum eRender3DMode { None, SideBySide, TopAndBottom, SideBySideTo2D, TopAndBottomTo2D };
+    public enum eRender3DMode { None, SideBySide, TopAndBottom, SideBySideTo2D, TopAndBottomTo2D, SideBySideFrom2D };
 
     static eRender3DMode _render3DMode;
 
@@ -288,6 +291,10 @@ namespace MediaPortal.GUI.Library
       }
     }
 
+    public static List<Texture> LastFrames { get; set; }
+    public static int LastFramesIndex;
+    public static int Convert2Dto3DSkewFactor { get; set; }
+    
     public enum eRender3DModeHalf { None, SBSLeft, SBSRight, TABTop, TABBottom };
 
     public static eRender3DModeHalf Render3DModeHalf { get; set; }
