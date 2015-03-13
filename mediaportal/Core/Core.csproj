@@ -436,7 +436,6 @@
     <Compile Include="Player\Teletext\TeletextReceiver.cs" />
     <Compile Include="Player\TeletextSubtitles\TeletextSubtitleDecoder.cs" />
     <Compile Include="Player\TeletextSubtitles\TextConversion.cs" />
-    <Compile Include="Player\TestPattern.cs" />
     <Compile Include="Player\TSHeader.cs" />
     <Compile Include="Player\TSReaderPlayer.cs" />
     <Compile Include="Player\Windows7Helper.cs" />
