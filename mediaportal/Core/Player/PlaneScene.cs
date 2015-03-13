@@ -87,7 +87,7 @@ namespace MediaPortal.Player
     private const int _full3DTABMinHeight = 720 * 2;
     private const int _full3DSBSMinWidth  = 1280 * 2;
    
-    private static TestPattern _testPattern = null;
+    private static TestPatternsRenderer _testPattern = null;
 
     private FrameGrabber grabber = FrameGrabber.GetInstance();
 
@@ -108,7 +108,6 @@ namespace MediaPortal.Player
                                             7.06f, 10.15f, 12.65f, 5.88f, 11.47f, 5.58f, 11.47f, 5.88f, 12.65f, 10.15f,
                                             7.06f
                                           };
-
     #endregion
 
     #region ctor
@@ -563,7 +562,7 @@ namespace MediaPortal.Player
     public static void DrawTestPattern(Surface backbuffer, Rectangle sourceRect, Rectangle targetRect)
     {
         if (_testPattern == null)
-            _testPattern = new TestPattern();
+            _testPattern = new TestPatternsRenderer(); // init test pattern at first usage
 
         if (GUIGraphicsContext.IsPlayingVideo && GUIGraphicsContext.IsFullScreenVideo)
         {
