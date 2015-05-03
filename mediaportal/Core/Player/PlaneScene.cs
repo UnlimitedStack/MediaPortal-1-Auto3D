@@ -625,9 +625,9 @@ namespace MediaPortal.Player
                                                             TextureFilter.Point);
                 surfaceLastFrame.Dispose();
             }
-            else // render right image for 2D to 3D conversion
-            {                
-                int lastIndex = GUIGraphicsContext.LastFramesIndex - 1;
+            else // render right image of the last frame for 2D to 3D conversion, the difference between 2 frames generates a 3D effect only for moving objects...
+            {
+				int lastIndex = GUIGraphicsContext.LastFramesIndex - 1;
 
                 if (lastIndex < 0)
                     lastIndex = GUIGraphicsContext.LastFrames.Count + lastIndex;
@@ -638,23 +638,28 @@ namespace MediaPortal.Player
 
                     if (surfaceLastFrame != null)
                     {
-                        double xSkewPerLine = (double)(GUIGraphicsContext.Convert2Dto3DSkewFactor / 1000f * backbuffer.Description.Width) / backbuffer.Description.Height;
+						// generate additional 3D effect for not moving objects by stretching the right image...
+
+                        double xSkewPerLine = (double)(GUIGraphicsContext.Convert2Dto3DSkewFactor / 1000f * backbuffer.Description.Width) / (backbuffer.Description.Height - 1);
+						int horzOffset = (int)(xSkewPerLine * backbuffer.Description.Height);
 
                         for (int y = 0; y < backbuffer.Description.Height; y++)
                         {
+							/*int horzDelta = (int)(xSkewPerLine * (backbuffer.Description.Height - y));
+
+							GUIGraphicsContext.DX9Device.StretchRectangle(surfaceLastFrame,
+                            new Rectangle(horzDelta, y, backbuffer.Description.Width - horzDelta * 2, 1),
+                            backbuffer,
+                            new Rectangle(targetRect.X, y, targetRect.Width, 1),
+                            TextureFilter.Point);*/
+
                             int horzDelta = (int)(xSkewPerLine * y);
-
-                            /*GUIGraphicsContext.DX9Device.StretchRectangle(surfaceLastFrame,
-                                                                            new Rectangle(xDelta, y, backbuffer.Description.Width - GUIGraphicsContext.Convert2Dto3DSkewFactor, 1),
-                                                                            backbuffer,
-                                                                            new Rectangle(targetRect.X, y, targetRect.Width, 1),
-                                                                            TextureFilter.Point);*/
-
+																									
                             GUIGraphicsContext.DX9Device.StretchRectangle(surfaceLastFrame,
-                                                                            new Rectangle(horzDelta, y, backbuffer.Description.Width - horzDelta * 2, 1),
-                                                                            backbuffer,
-                                                                            new Rectangle(targetRect.X, y, targetRect.Width, 1),
-                                                                            TextureFilter.Point);
+                            new Rectangle(horzDelta, y, backbuffer.Description.Width - horzOffset * 2 + horzDelta, 1),
+                            backbuffer,
+                            new Rectangle(targetRect.X, y, targetRect.Width, 1),
+                            TextureFilter.Point);
                         }
 
                         surfaceLastFrame.Dispose();
