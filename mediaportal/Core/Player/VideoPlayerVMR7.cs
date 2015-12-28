@@ -409,11 +409,13 @@ namespace MediaPortal.Player
       if (SubtitleStreams == 0) return;
       if (!SubEngine.GetInstance().AutoShow) return;
       CultureInfo ci = null;
+      bool autoloadSubtitle = false;
 
       using (Settings xmlreader = new MPSettings())
       {
         try
         {
+          autoloadSubtitle = xmlreader.GetValueAsBool("subtitles", "autoloadSubtitle", false);
           ci = new CultureInfo(xmlreader.GetValueAsString("subtitles", "language", defaultLanguageCulture));
           Log.Info("VideoPlayerVMR7: Subtitle CultureInfo {0}", ci);
         }
@@ -440,10 +442,14 @@ namespace MediaPortal.Player
         {
           CurrentSubtitleStream = i;
           Log.Info("VideoPlayerVMR7: CultureInfo Selected active subtitle track language: {0} ({1})", ci.EnglishName, i);
+          EnableSubtitle = true;
           break;
         }
       }
-      EnableSubtitle = true;
+      if (autoloadSubtitle)
+      {
+        EnableSubtitle = true;
+      }
     }
 
     protected void SelectAudioLanguage()
